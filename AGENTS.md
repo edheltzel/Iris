@@ -22,6 +22,12 @@
 - Spynel is alpha software and supports only its current configuration, state, manifest, session, and workflow schemas. Validate current setting values and reject obsolete state, manifest, session, and workflow representations. Ignore unused configuration keys on load without rewriting the file; ordinary canonical saves remove them. Do not retain configuration migrations or fallback readers. Prefer one clear current representation over preserving pre-release data.
 - There is no OpenAI-compatible HTTP façade. Channels, harnesses, and trusted executable hooks are extended through explicit interfaces.
 
+## Scope / VISION
+
+- Iris conversion **scope, spec, and plan** live in [`docs/iris-vision.md`](docs/iris-vision.md). That file is the full FM-553 living SoT for conversion handoffs (`box` grok-ship/reports is no longer parallel law).
+- [`docs/README.md`](docs/README.md) indexes what is authoritative (`iris-vision.md`) versus companion provenance (`docs/exceed-inventory.md`).
+- Do not treat `docs/exceed-inventory.md` or ticket exports as a second competing spec. Public product positioning remains [`docs/vision.md`](docs/vision.md) until a later identity/rename ship.
+
 ## Read Before Editing
 
 1. Read the root AGENTS.md.
