@@ -3,6 +3,7 @@
 .spynel/
 # Repository-local disposable scratch and build outputs
 .tmp*/
+.codegraph/
 /.reviewer-probe/
 /npm/vendor/
 
