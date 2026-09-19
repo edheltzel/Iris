@@ -186,7 +186,7 @@ These three close the Firstmate + Sentinel exceed bar. **Phase 2 order locked (F
 
 Legend: **M** = must-match · **E** = must-exceed · **D** = drop from Spynel product · **L** = later · **S** = steal into Iris · **I** = inherit Spynel day-one
 
-Full evidence table: `/home/box/agent-data/grok-ship/reports/FM-554-iris-exceed-inventory.md`.
+Full evidence table: [`docs/exceed-inventory.md`](exceed-inventory.md).
 
 | Capability | Firstmate | Sentinel (live) | Spynel / Iris inherit | Iris target |
 | --- | --- | --- | --- | --- |
@@ -336,13 +336,13 @@ Smallest ships, one concern each. **Order locked (grill 2026-09-18):**
 
 Phase 0 is **done** when all of the following are true:
 
-1. This file exists at `/home/box/agent-data/grok-ship/reports/FM-553-iris-vision.md` and a copy at `/Users/ed/Developer/Atlas/reviews/FM-553-iris-vision.md`.
+1. This file exists at `docs/iris-vision.md` as the living SoT. `box` grok-ship/reports is not parallel law.
 2. Product one-liner, non-goals, rename plan, capability matrix, phased plan, and open HIL Qs are present.
-3. **FM-554 exceed inventory is folded**
+3. **FM-554 exceed inventory is folded** — companion provenance is `docs/exceed-inventory.md`.
 3b. **FM-558 UX lock present** — blinking eyeball for busy/loading/working; no second channel mascot face. — especially top gaps: (1) no-mistakes hook gate (2) zero-token + quota dispatch (3) Herdr socket-first + Grok Bot transition notify with Atlas sole door.
 4. Dual-track lock is explicit: Sentinel live + Iris destination.
 5. Fork home is locked as `edheltzel/Iris` (FM-559); **create/retarget left to Atlas** — Intern does not invent remotes.
-6. Atlas has tips against **FM-553** / **FM-555**; captain can accept Phase 0 or answer HIL Qs — **no code/PR required for Phase 0**.
+6. Atlas has tips against **FM-553** / **FM-555**; captain can accept Phase 0 from this file.
 
 **Phase 0 exit → Phase 1:** fork home locked (`edheltzel/Iris`); Atlas creates/retargets; Phase 1 rename ship: CLI/binary/**npm** → `iris` / publish **`@edheltzel/iris`** (FM-560+569+**573**), `~/.iris` + one-shot migrate (FM-561), hard cut no `spynel` binary/alias (FM-562), Go module/imports → iris (FM-563).
 
@@ -352,9 +352,9 @@ Phase 0 is **done** when all of the following are true:
 
 | Doc / issue | Path / URL |
 | --- | --- |
-| Dual-track gap map | `/home/box/agent-data/grok-ship/reports/FM-543-spynel-vs-sentinel.md` |
-| Extensibility scout | `/home/box/agent-data/grok-ship/reports/FM-551-spynel-extensibility.md` |
-| Exceed inventory | `/home/box/agent-data/grok-ship/reports/FM-554-iris-exceed-inventory.md` |
+| Dual-track gap map | Historical factory report FM-543 (not in this repo). Tracking: Sentinel #49 |
+| Extensibility scout | Historical factory report FM-551 (not in this repo) |
+| Exceed inventory | [`docs/exceed-inventory.md`](exceed-inventory.md) |
 | Dual-track tracking | https://github.com/edheltzel/Sentinel/issues/49 |
 | Wait / notify / no-mistakes / Grok Bot | Sentinel #43 · #44 · #45 · #16 |
 | Upstream Spynel | https://github.com/agent0ai/spynel |

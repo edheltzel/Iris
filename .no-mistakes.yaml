@@ -1,0 +1,8 @@
+# Local gate + generated PR CI. Commands match AGENTS.md handoff verification.
+commands:
+  test: ./scripts/dev.sh test && ./scripts/smoke.sh && node npm/test.js
+
+document:
+  instructions: |
+    docs/iris-vision.md is the Iris conversion SoT. docs/vision.md is public
+    positioning. docs/exceed-inventory.md is provenance only.
