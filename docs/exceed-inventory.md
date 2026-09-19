@@ -1,4 +1,4 @@
-`docs/VISION.md` is the living Iris scope SoT. This file is FM-554 companion provenance, not a second spec.
+`docs/iris-vision.md` is the living Iris scope SoT. This file is FM-554 companion provenance, not a second spec.
 
 # FM-554 — Iris exceed-bar inventory
 

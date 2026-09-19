@@ -6,8 +6,8 @@ Use this page to choose the shortest path to the information you need. The repos
 
 Handoffs start here, then read the authoritative file.
 
-- **Authoritative** — [VISION.md](VISION.md) is the full FM-553 living Iris scope/spec (amend history, phases, locks). Not a stub. `box` grok-ship/reports is no longer parallel law.
-- **Companion** — [exceed-inventory.md](exceed-inventory.md) is the full FM-554 inventory for provenance. VISION.md already folded that inventory (FM-555). It is not a second spec.
+- **Authoritative** — [iris-vision.md](iris-vision.md) is the full FM-553 living Iris scope/spec (amend history, phases, locks). Not a stub. `box` grok-ship/reports is no longer parallel law.
+- **Companion** — [exceed-inventory.md](exceed-inventory.md) is the full FM-554 inventory for provenance. `iris-vision.md` already folded that inventory (FM-555). It is not a second spec.
 - **Public positioning** — [vision.md](vision.md) remains the current product-positioning doc until a later identity/rename ship. Do not treat it as the conversion plan.
 
 ## Start and operate
@@ -28,7 +28,7 @@ Handoffs start here, then read the authoritative file.
 
 ## Understand and maintain
 
-- [Iris conversion VISION](VISION.md) — full FM-553 living scope/spec/plan SoT (phases, locks, amend history).
+- [Iris conversion vision](iris-vision.md) — full FM-553 living scope/spec/plan SoT (phases, locks, amend history).
 - [Exceed inventory (companion)](exceed-inventory.md) — full FM-554 inventory; provenance only, not a second spec.
 - [Product vision](vision.md) — positioning, product boundaries, and the three pillars.
 - [Architecture](architecture.md) — application, process, history, harness, channel, and orchestration design.

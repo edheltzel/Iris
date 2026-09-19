@@ -1,4 +1,4 @@
-This in-repo file is the living Iris scope/spec SoT. `box` grok-ship/reports is no longer parallel law.
+This in-repo file (`docs/iris-vision.md`) is the living Iris scope/spec SoT. `box` grok-ship/reports is no longer parallel law.
 
 # FM-553 — Iris conversion VISION / spec
 
