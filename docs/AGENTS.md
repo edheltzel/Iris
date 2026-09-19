@@ -8,7 +8,7 @@
 
 - Commands and configuration examples must match executable behavior and embedded defaults.
 - Keep public positioning aligned with the root product contract and `docs/vision.md`: Spynel is a classic non-AI orchestration program, external harnesses provide intelligence, and the single “agent” in the relationship slogan denotes the human-facing assistant interface. Adapt copy length to its surface without inventing product facts or treating conceptual scale as a resource guarantee.
-- Conversion/handoff scope, spec, and plan are owned by `docs/VISION.md` (living SoT). `docs/exceed-inventory.md` is companion provenance only. `docs/vision.md` remains public product positioning until a later identity/rename ship.
+- Conversion/handoff scope, spec, and plan are owned by `docs/VISION.md` (full FM-553 living SoT). `docs/exceed-inventory.md` is the FM-554 companion inventory (provenance only). `docs/vision.md` remains public product positioning until a later identity/rename ship.
 - Keep root-README image assets under `.github/resources/`; `docs/` owns documentation content rather than repository-presentation artwork.
 - Document `.spynel/config.yaml` as the canonical private configuration, workspace-root-relative path resolution, the fixed non-configurable `.spynel` state directory, and validation of current settings, ignored unused input keys, and their removal on the next canonical save.
 - Keep `docs/agent-docs.md`, the curated `internal/agentdocs` catalog, concise `/help` metadata, harness prompt guidance, and CLI examples synchronized. Static documentation must remain offline, bounded, classified, and free of live/private workspace data.

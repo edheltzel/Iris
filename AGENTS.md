@@ -24,7 +24,7 @@
 
 ## Scope / VISION
 
-- Iris conversion **scope, spec, and plan** live in [`docs/VISION.md`](docs/VISION.md). That file is the source of truth for conversion handoffs.
+- Iris conversion **scope, spec, and plan** live in [`docs/VISION.md`](docs/VISION.md). That file is the full FM-553 living SoT for conversion handoffs (`box` grok-ship/reports is no longer parallel law).
 - [`docs/README.md`](docs/README.md) indexes what is authoritative (`VISION.md`) versus companion provenance (`docs/exceed-inventory.md`).
 - Do not treat `docs/exceed-inventory.md` or ticket exports as a second competing spec. Public product positioning remains [`docs/vision.md`](docs/vision.md) until a later identity/rename ship.
 
