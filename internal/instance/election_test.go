@@ -169,6 +169,74 @@ func TestEnvironmentIDResolvesDualLegacyNamespaces(t *testing.T) {
 		}
 	})
 
+	t.Run("resumes partial migration", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+		config, err := os.UserConfigDir()
+		if err != nil {
+			t.Fatal(err)
+		}
+		root := filepath.Join(home, ".agents", "Iris")
+		legacy := filepath.Join(config, "spynel")
+		for _, directory := range []string{filepath.Join(root, "processes"), filepath.Join(legacy, "processes")} {
+			if err := os.MkdirAll(directory, 0o700); err != nil {
+				t.Fatal(err)
+			}
+		}
+		token := strings.Repeat("ef", environmentTokenBytes)
+		if err := os.WriteFile(filepath.Join(legacy, "environment-token"), []byte(token+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, "processes", "123.json"), []byte("current"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(legacy, "processes", "123.json"), []byte("legacy"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		for attempt := 1; attempt <= 2; attempt++ {
+			if _, err := EnvironmentID(); err == nil || !strings.Contains(err.Error(), "migration entry conflicts with destination") {
+				t.Fatalf("attempt %d conflict = %v", attempt, err)
+			}
+		}
+		data, err := os.ReadFile(filepath.Join(root, "environment-token"))
+		if err != nil || strings.TrimSpace(string(data)) != token {
+			t.Fatalf("partially migrated token = %q, %v", data, err)
+		}
+		if _, err := os.Stat(legacy); err != nil {
+			t.Fatalf("conflicting source removed: %v", err)
+		}
+	})
+
+	t.Run("rejects destination token conflict", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+		config, err := os.UserConfigDir()
+		if err != nil {
+			t.Fatal(err)
+		}
+		root := filepath.Join(home, ".agents", "Iris")
+		legacy := filepath.Join(config, "spynel")
+		for _, directory := range []string{root, legacy} {
+			if err := os.MkdirAll(directory, 0o700); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := os.WriteFile(filepath.Join(root, "environment-token"), []byte(strings.Repeat("ab", environmentTokenBytes)+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(legacy, "environment-token"), []byte(strings.Repeat("cd", environmentTokenBytes)+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := EnvironmentID(); err == nil || !strings.Contains(err.Error(), "legacy environment identity conflicts with destination") {
+			t.Fatalf("destination-token conflict = %v", err)
+		}
+		if _, err := os.Stat(legacy); err != nil {
+			t.Fatalf("conflicting source removed: %v", err)
+		}
+	})
+
 	t.Run("merges tokenless leftovers", func(t *testing.T) {
 		home := t.TempDir()
 		t.Setenv("HOME", home)

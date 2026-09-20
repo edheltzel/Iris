@@ -110,37 +110,52 @@ func EnvironmentID() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("inspect environment identity directory: %w", err)
 	}
-	if !hasToken {
-		if directory, configErr := os.UserConfigDir(); configErr == nil {
-			iris := filepath.Join(directory, "iris")
-			spynel := filepath.Join(directory, "spynel")
-			irisToken, err := environmentTokenExists(iris)
-			if err != nil {
-				return "", fmt.Errorf("inspect Iris identity migration source: %w", err)
+	if directory, configErr := os.UserConfigDir(); configErr == nil {
+		iris := filepath.Join(directory, "iris")
+		spynel := filepath.Join(directory, "spynel")
+		irisToken, err := environmentTokenExists(iris)
+		if err != nil {
+			return "", fmt.Errorf("inspect Iris identity migration source: %w", err)
+		}
+		spynelToken, err := environmentTokenExists(spynel)
+		if err != nil {
+			return "", fmt.Errorf("inspect Spynel identity migration source: %w", err)
+		}
+		var source string
+		switch {
+		case irisToken && spynelToken:
+			return "", errors.New("both legacy environment identity sources contain tokens")
+		case irisToken:
+			source = iris
+		case spynelToken:
+			source = spynel
+		case !hasToken:
+			err = fsx.MergeDir(root, spynel)
+			if err == nil {
+				hasToken, err = environmentTokenExists(root)
 			}
-			spynelToken, err := environmentTokenExists(spynel)
-			if err != nil {
-				return "", fmt.Errorf("inspect Spynel identity migration source: %w", err)
-			}
-			switch {
-			case irisToken && spynelToken:
-				return "", errors.New("both legacy environment identity sources contain tokens")
-			case irisToken:
+			if err == nil && !hasToken {
 				err = fsx.MergeDir(root, iris)
-			case spynelToken:
-				err = fsx.MergeDir(root, spynel)
-			default:
-				err = fsx.MergeDir(root, spynel)
-				if err == nil {
-					hasToken, err = environmentTokenExists(root)
+			}
+		}
+		if err == nil && source != "" {
+			if hasToken {
+				destinationToken, tokenErr := readEnvironmentToken(path)
+				if tokenErr != nil {
+					return "", fmt.Errorf("read destination environment identity: %w", tokenErr)
 				}
-				if err == nil && !hasToken {
-					err = fsx.MergeDir(root, iris)
+				sourceToken, tokenErr := readEnvironmentToken(filepath.Join(source, "environment-token"))
+				if tokenErr != nil {
+					return "", fmt.Errorf("read legacy environment identity: %w", tokenErr)
+				}
+				if sourceToken != destinationToken {
+					return "", errors.New("legacy environment identity conflicts with destination")
 				}
 			}
-			if err != nil {
-				return "", fmt.Errorf("migrate environment identity directory: %w", err)
-			}
+			err = fsx.MergeDir(root, source)
+		}
+		if err != nil {
+			return "", fmt.Errorf("migrate environment identity directory: %w", err)
 		}
 	}
 	token, err := readEnvironmentToken(path)
