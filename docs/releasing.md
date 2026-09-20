@@ -41,7 +41,7 @@ Create a GitHub Release with a `v`-prefixed semantic version tag, for example `v
 
 The npm package uses the root repository `README.md` from the released commit. Before publication, relative Markdown document links are pinned to that GitHub tag and relative Markdown or HTML image sources are pinned to `raw.githubusercontent.com` at the same tag. Consequently, an npm version keeps a stable README snapshot even when the default branch changes later.
 
-The npm postinstall script maps supported Node platforms to the four archive names, downloads the matching archive and `checksums.txt`, verifies SHA-256, validates the executable, and atomically replaces `npm/vendor/` with the complete extracted runtime. It rejects Windows before any download and never runs Spynel during package installation. `SPYNEL_DOWNLOAD_BASE` may point installation at a trusted compatible mirror.
+The npm postinstall script maps supported Node platforms to the four archive names, downloads the matching archive and `checksums.txt`, verifies SHA-256, validates the executable, and atomically replaces `npm/vendor/` with the complete extracted runtime. It rejects Windows before any download and does not ordinarily run Iris during package installation. The sole exception is an ownership-validated cleanup that runs the installed binary to stop exact legacy processes and remove exact startup registrations before npm removes the verified unscoped `spynel` package. `SPYNEL_DOWNLOAD_BASE` may point installation at a trusted compatible mirror.
 
 Before publishing, reproduce the local gates and build a runnable archive for the host target:
 

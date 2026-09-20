@@ -10,8 +10,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/user"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -80,6 +82,23 @@ func TestStartupManagerForLegacyProcess(t *testing.T) {
 				t.Fatalf("startup owner = %q, %q; want %q, %q", manager.Executable, manager.NPMLauncher, test.wantCommand, test.wantLauncher)
 			}
 		})
+	}
+}
+
+func TestCleanupUserHomeUsesAccountHome(t *testing.T) {
+	account, err := user.LookupId(strconv.Itoa(os.Getuid()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	home, err := cleanupUserHome(os.Getuid())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if home != filepath.Clean(account.HomeDir) {
+		t.Fatalf("cleanup home = %q, want account home %q", home, account.HomeDir)
+	}
+	if home == filepath.Clean(os.Getenv("HOME")) {
+		t.Fatal("cleanup home followed the test process HOME")
 	}
 }
 

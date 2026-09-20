@@ -21,6 +21,12 @@ const MAX_NPM_OUTPUT_BYTES = 64 * 1024;
 const LEGACY_PACKAGE = "spynel";
 const LEGACY_REPOSITORY = "git+https://github.com/agent0ai/spynel.git";
 
+function cleanupUserID(currentUserID = typeof process.getuid === "function" ? process.getuid() : -1, sudoUserID = process.env.SUDO_UID) {
+  if (currentUserID !== 0 || !/^(0|[1-9][0-9]*)$/.test(sudoUserID || "")) return currentUserID;
+  const parsed = Number(sudoUserID);
+  return Number.isSafeInteger(parsed) ? parsed : currentUserID;
+}
+
 function download(url, file, maxBytes, redirects = 0, secureRequired = new URL(url).protocol === "https:") {
   return new Promise((resolve, reject) => {
     const parsed = new URL(url);
@@ -168,7 +174,7 @@ function removeVerifiedLegacyGlobalPackage(packageRoot = path.resolve(__dirname,
   if (legacy.name !== LEGACY_PACKAGE || repository !== LEGACY_REPOSITORY ||
       !legacy.bin || legacy.bin.spynel !== "npm/bin/spynel.js") return;
 
-  const cleanup = childProcess.spawnSync(path.join(packageRoot, "npm", "vendor", "iris"), ["cleanup-legacy-npm", "--root", legacyRoot], {
+  const cleanup = childProcess.spawnSync(path.join(packageRoot, "npm", "vendor", "iris"), ["cleanup-legacy-npm", "--root", legacyRoot, "--user-id", String(cleanupUserID())], {
     stdio: "inherit",
     timeout: 30_000,
     windowsHide: false,
@@ -251,4 +257,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { install, validateArchiveEntries, validateExtractedTree };
+module.exports = { cleanupUserID, install, validateArchiveEntries, validateExtractedTree };

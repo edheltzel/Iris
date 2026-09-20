@@ -8,7 +8,7 @@ const stream = require("stream");
 const { spawn, spawnSync } = require("child_process");
 const { once } = require("events");
 const { resolve } = require("./platform");
-const { install, validateArchiveEntries, validateExtractedTree } = require("./install");
+const { cleanupUserID, install, validateArchiveEntries, validateExtractedTree } = require("./install");
 const { prepareRelease, releaseMetadata, rewriteReadme } = require("./prepare-release");
 const { STARTUP_PROMPT_TIMEOUT_MS, checkForUpdate, compareVersions, npmInvocation, promptForStartupUpdate, shouldCheckAtStartup } = require("./update");
 const { createLaunchEnvironment } = require("./bin/iris");
@@ -46,6 +46,9 @@ assert.strictEqual(pkg.description, "A non-AI orchestration layer connecting one
 assert.strictEqual(pkg.bin.iris, "npm/bin/iris.js");
 assert.strictEqual(pkg.publishConfig.registry, "https://registry.npmjs.org");
 assert.strictEqual(pkg.repository.url, "git+https://github.com/edheltzel/Iris.git");
+assert.strictEqual(cleanupUserID(0, "501"), 501);
+assert.strictEqual(cleanupUserID(0, "0501"), 0);
+assert.strictEqual(cleanupUserID(502, "501"), 502);
 assert.deepStrictEqual(releaseMetadata("v1.2.3-beta.1", "true"), {
   tag: "v1.2.3-beta.1",
   version: "1.2.3-beta.1",
@@ -240,7 +243,7 @@ if (args.join(" ") === "root --global") {
   console.log(process.env.LEGACY_NPM_ROOT);
 } else if (args.join(" ") === "uninstall --global spynel") {
   const calls = fs.readFileSync(process.env.LEGACY_NPM_LOG, "utf8");
-  if (!calls.includes("cleanup-legacy-npm --root " + process.env.LEGACY_NPM_PACKAGE + "\\n")) process.exit(3);
+  if (!calls.includes("cleanup-legacy-npm --root " + process.env.LEGACY_NPM_PACKAGE + " --user-id " + process.env.LEGACY_NPM_USER_ID + "\\n")) process.exit(3);
   fs.rmSync(process.env.LEGACY_NPM_PACKAGE, {recursive: true, force: true});
 } else {
   process.exitCode = 2;
@@ -252,6 +255,7 @@ if (args.join(" ") === "root --global") {
       LEGACY_NPM_LOG: log,
       LEGACY_NPM_ROOT: globalRoot,
       LEGACY_NPM_PACKAGE: legacyRoot,
+      LEGACY_NPM_USER_ID: String(process.getuid()),
     };
     const runInstall = () => spawnSync(process.execPath, [path.join(npmDirectory, "install.js")], {
       cwd: packageRoot,
@@ -273,7 +277,7 @@ if (args.join(" ") === "root --global") {
     assert.strictEqual(fs.existsSync(legacyRoot), false);
     assert.strictEqual(
       fs.readFileSync(log, "utf8"),
-      `root --global\ncleanup-legacy-npm --root ${legacyRoot}\nuninstall --global spynel\n`,
+      `root --global\ncleanup-legacy-npm --root ${legacyRoot} --user-id ${process.getuid()}\nuninstall --global spynel\n`,
     );
 
     fs.mkdirSync(legacyRoot);

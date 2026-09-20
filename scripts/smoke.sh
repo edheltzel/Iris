@@ -18,7 +18,7 @@ mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME"
 dev_bin_dir="$smoke_dir/user bin"
 other_bin_dir="$smoke_dir/other bin"
 mkdir -p "$dev_bin_dir" "$other_bin_dir"
-printf 'legacy development build\n' > "$dev_bin_dir/spynel"
+ln -s "$binary" "$dev_bin_dir/spynel"
 printf 'unrelated command\n' > "$other_bin_dir/spynel"
 PATH="$other_bin_dir:$PATH" SPYNEL_DEV_BIN_DIR="$dev_bin_dir" "$script_dir/install-dev.sh" >/dev/null
 test -x "$dev_bin_dir/iris"

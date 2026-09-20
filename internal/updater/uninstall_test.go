@@ -239,7 +239,7 @@ func TestUninstallNPMStopsBinaryBeforePackageRemoval(t *testing.T) {
 	}
 }
 
-func TestStopLegacyNPMRemovesRuntimeWithoutPackage(t *testing.T) {
+func TestStopLegacyNPMWithoutRuntimeMarker(t *testing.T) {
 	prefix, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -253,11 +253,7 @@ func TestStopLegacyNPMRemovesRuntimeWithoutPackage(t *testing.T) {
 		"repository": map[string]string{"url": "git+https://github.com/agent0ai/spynel.git"},
 		"bin":        map[string]string{"spynel": "npm/bin/spynel.js"},
 	})
-	marker, _ := json.Marshal(map[string]string{"version": "0.12.2"})
 	if err := os.WriteFile(filepath.Join(root, "package.json"), metadata, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(root, "npm", "vendor", ".installed.json"), marker, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	manager := &Manager{PackageRoot: root}

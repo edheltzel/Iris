@@ -184,14 +184,8 @@ func (m *Manager) StopLegacyNPM(ctx context.Context, removeStartup func(string) 
 
 func validLegacyNPMRoot(root string) bool {
 	manifestPath := filepath.Join(root, "package.json")
-	markerPath := filepath.Join(root, "npm", "vendor", ".installed.json")
-	for _, path := range []string{manifestPath, markerPath} {
-		info, err := os.Lstat(path)
-		if err != nil || !info.Mode().IsRegular() || info.Size() > 65536 {
-			return false
-		}
-	}
-	if !validNPMRootPackage(root, "", "spynel") {
+	info, err := os.Lstat(manifestPath)
+	if err != nil || !info.Mode().IsRegular() || info.Size() > 65536 {
 		return false
 	}
 	data, err := os.ReadFile(manifestPath)
@@ -199,10 +193,11 @@ func validLegacyNPMRoot(root string) bool {
 		return false
 	}
 	var metadata struct {
+		Name       string            `json:"name"`
 		Repository json.RawMessage   `json:"repository"`
 		Bin        map[string]string `json:"bin"`
 	}
-	if json.Unmarshal(data, &metadata) != nil || metadata.Bin["spynel"] != "npm/bin/spynel.js" {
+	if json.Unmarshal(data, &metadata) != nil || metadata.Name != "spynel" || metadata.Bin["spynel"] != "npm/bin/spynel.js" {
 		return false
 	}
 	var repository string

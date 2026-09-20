@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -20,11 +21,16 @@ import (
 func runCleanupLegacyNPM(args []string) error {
 	flags := flag.NewFlagSet("cleanup-legacy-npm", flag.ContinueOnError)
 	root := flags.String("root", "", "legacy npm package directory")
+	userID := flags.Int("user-id", os.Getuid(), "user whose startup registrations are removed")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
-	if flags.NArg() != 0 || !filepath.IsAbs(*root) {
-		return errors.New("cleanup-legacy-npm requires an absolute root")
+	if flags.NArg() != 0 || !filepath.IsAbs(*root) || *userID < 0 || os.Geteuid() != 0 && *userID != os.Getuid() {
+		return errors.New("cleanup-legacy-npm requires an absolute root and authorized user ID")
+	}
+	home, err := cleanupUserHome(*userID)
+	if err != nil {
+		return err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -34,9 +40,26 @@ func runCleanupLegacyNPM(args []string) error {
 		if err != nil {
 			return err
 		}
+		manager.Home = home
 		manager.NPMLauncher = filepath.Join(root, "npm", "bin", "spynel.js")
-		return manager.RemoveInstallation(ctx, os.Getuid())
+		return manager.RemoveInstallation(ctx, *userID)
 	})
+}
+
+func cleanupUserHome(userID int) (string, error) {
+	account, err := user.LookupId(strconv.Itoa(userID))
+	if err != nil {
+		return "", fmt.Errorf("look up cleanup user: %w", err)
+	}
+	home := filepath.Clean(account.HomeDir)
+	info, err := os.Stat(home)
+	if err != nil {
+		return "", fmt.Errorf("inspect cleanup user home: %w", err)
+	}
+	if !filepath.IsAbs(home) || home == string(filepath.Separator) || !info.IsDir() {
+		return "", errors.New("cleanup user has an invalid home directory")
+	}
+	return home, nil
 }
 
 func runUninstallBundles(args []string) error {
