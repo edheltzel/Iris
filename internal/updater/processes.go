@@ -20,6 +20,8 @@ import (
 	"github.com/edheltzel/iris/internal/fsx"
 )
 
+const legacyProcessModule = "github.com/agent0ai/spynel"
+
 // ProcessRegistration identifies a live server/TUI, including secondary TUIs
 // and servers in other workspaces. It contains no workspace credentials.
 type ProcessRegistration struct {
@@ -155,6 +157,35 @@ func processMatches(record ProcessRegistration, path string) bool {
 		strings.HasPrefix(filepath.Base(npmRootFromExecutable(path)), "."+filepath.Base(root)+"-")
 }
 
+func legacyProcessRoot(path string) string {
+	path = strings.TrimSuffix(path, " (deleted)")
+	if filepath.Base(path) != "spynel" {
+		return ""
+	}
+	bundle := filepath.Dir(path)
+	releases := filepath.Dir(bundle)
+	root := filepath.Dir(releases)
+	if filepath.Base(releases) == "releases" && ownedRoot(root) {
+		if _, err := readBundle(bundle); err == nil {
+			return root
+		}
+	}
+	root = npmRootFromExecutable(path)
+	if validNPMRootPackage(root, "", "spynel") {
+		return root
+	}
+	return ""
+}
+
+func legacyProcessOwned(record ProcessRegistration, path string) bool {
+	root := legacyProcessRoot(path)
+	if root == record.Installation {
+		return root != ""
+	}
+	return root != "" && record.Installation != "" && npmRootFromExecutable(strings.TrimSuffix(path, " (deleted)")) == root &&
+		filepath.Dir(root) == filepath.Dir(record.Installation) && strings.HasPrefix(filepath.Base(root), "."+filepath.Base(record.Installation)+"-")
+}
+
 func liveProcesses() ([]ProcessRegistration, error) {
 	ids, err := installationProcessIDs()
 	if err != nil {
@@ -190,17 +221,18 @@ func processRecords(ids []int) ([]ProcessRegistration, error) {
 			if err != nil {
 				info, err = buildinfo.ReadFile(record.Executable)
 			}
-			if err == nil && info.Path == own.Path {
+			if err == nil && (info.Path == own.Path || info.Path == legacyProcessModule && legacyProcessOwned(record, path)) {
 				records = append(records, record)
 				continue
 			}
 		}
-		if filepath.Base(strings.TrimSuffix(path, " (deleted)")) != "iris" {
+		executable := strings.TrimSuffix(path, " (deleted)")
+		name := filepath.Base(executable)
+		if name != "iris" && name != "spynel" {
 			continue
 		}
 		info, err := buildinfo.ReadFile(processImagePath(pid, path))
-		if err == nil && info.Path == own.Path {
-			executable := strings.TrimSuffix(path, " (deleted)")
+		if err == nil && info.Path == own.Path && name == "iris" {
 			root := npmRootFromExecutable(executable)
 			if strings.HasPrefix(filepath.Base(root), ".iris-") {
 				root = filepath.Join(filepath.Dir(root), "iris")
@@ -209,6 +241,10 @@ func processRecords(ids []int) ([]ProcessRegistration, error) {
 				root = ""
 			}
 			records = append(records, ProcessRegistration{PID: pid, Executable: executable, Installation: root})
+		} else if err == nil && info.Path == legacyProcessModule && name == "spynel" {
+			if root := legacyProcessRoot(executable); root != "" {
+				records = append(records, ProcessRegistration{PID: pid, Executable: executable, Installation: root})
+			}
 		}
 	}
 	return records, nil

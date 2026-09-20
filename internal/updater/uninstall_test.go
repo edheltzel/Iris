@@ -99,6 +99,7 @@ func TestUninstallStopsOnlyOwnedProcessesAndPreservesWorkspace(t *testing.T) {
 	}
 	first := uninstallFixtureProcess(t, filepath.Join(root, "releases", "first", "iris"), "term")
 	second := uninstallFixtureProcess(t, filepath.Join(root, "releases", "second", "iris"), "ignore-term")
+	legacy := uninstallFixtureProcess(t, filepath.Join(root, "releases", "legacy", "spynel"), "term")
 	unrelated := uninstallFixtureProcess(t, filepath.Join(t.TempDir(), "iris"), "term")
 	workspace := filepath.Join(root, ".spynel")
 	if err := os.Mkdir(workspace, 0700); err != nil {
@@ -151,7 +152,7 @@ func TestUninstallStopsOnlyOwnedProcessesAndPreservesWorkspace(t *testing.T) {
 	if !removedStartup {
 		t.Fatal("startup cleanup was skipped")
 	}
-	for _, command := range []*exec.Cmd{first, second} {
+	for _, command := range []*exec.Cmd{first, second, legacy} {
 		if path, err := installationProcessPath(command.Process.Pid); err == nil && manager.ownsProcessPath(root, path) {
 			t.Fatal("uninstalled process is still running")
 		}

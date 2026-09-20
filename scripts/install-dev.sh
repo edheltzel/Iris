@@ -78,6 +78,10 @@ cp "$built_binary" "$staged"
 chmod 0755 "$staged"
 mv -f "$staged" "$target"
 trap - EXIT HUP INT TERM
+legacy_target="$bin_dir/spynel"
+if [ -f "$legacy_target" ] || [ -L "$legacy_target" ]; then
+  rm -f "$legacy_target"
+fi
 
 path_contains() {
   previous_ifs=$IFS

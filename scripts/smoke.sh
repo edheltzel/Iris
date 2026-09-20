@@ -11,8 +11,14 @@ smoke_dir=$(mktemp -d "${TMPDIR:-/tmp}/iris-smoke.XXXXXX")
 trap 'rm -rf "$smoke_dir"' EXIT HUP INT TERM
 
 dev_bin_dir="$smoke_dir/user bin"
-SPYNEL_DEV_BIN_DIR="$dev_bin_dir" "$script_dir/install-dev.sh" >/dev/null
+other_bin_dir="$smoke_dir/other bin"
+mkdir -p "$dev_bin_dir" "$other_bin_dir"
+printf 'legacy development build\n' > "$dev_bin_dir/spynel"
+printf 'unrelated command\n' > "$other_bin_dir/spynel"
+PATH="$other_bin_dir:$PATH" SPYNEL_DEV_BIN_DIR="$dev_bin_dir" "$script_dir/install-dev.sh" >/dev/null
 test -x "$dev_bin_dir/iris"
+test ! -e "$dev_bin_dir/spynel"
+test "$(cat "$other_bin_dir/spynel")" = 'unrelated command'
 "$dev_bin_dir/iris" version >/dev/null
 
 docs_index=$(cd "$smoke_dir" && "$binary" docs)

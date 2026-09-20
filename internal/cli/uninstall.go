@@ -85,13 +85,19 @@ func runUninstallBundles(args []string) error {
 			if err != nil {
 				return err
 			}
-			manager.Executable = filepath.Join(installation.InstallRoot, "iris")
 			manager.NPMLauncher = ""
+			executables := []string{filepath.Join(installation.InstallRoot, "iris"), filepath.Join(installation.InstallRoot, "spynel")}
 			if installation.PackageRoot != "" {
-				manager.Executable = filepath.Join(installation.PackageRoot, "npm", "vendor", "iris")
+				executables = []string{filepath.Join(installation.PackageRoot, "npm", "vendor", "iris")}
 				manager.NPMLauncher = filepath.Join(installation.PackageRoot, "npm", "bin", "iris.js")
 			}
-			return manager.RemoveInstallation(ctx, *userID)
+			for _, executable := range executables {
+				manager.Executable = executable
+				if err := manager.RemoveInstallation(ctx, *userID); err != nil {
+					return err
+				}
+			}
+			return nil
 		}); err != nil {
 			return err
 		}

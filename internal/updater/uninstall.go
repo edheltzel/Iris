@@ -210,10 +210,16 @@ func (m *Manager) NeedsAdministrator() bool {
 func (m *Manager) ownsProcessPath(root, path string) bool {
 	path = strings.TrimSuffix(path, " (deleted)")
 	if m.InstallRoot == "" {
-		return npmRootFromExecutable(path) == root
+		name := filepath.Base(path)
+		return (name == "iris" || name == "spynel") && npmRootFromExecutable(path) == root
 	}
+	return standaloneProcessPath(root, path)
+}
+
+func standaloneProcessPath(root, path string) bool {
 	relative, err := filepath.Rel(filepath.Join(root, "releases"), path)
-	return err == nil && filepath.Base(relative) == "iris" && len(strings.Split(relative, string(filepath.Separator))) == 2 && !strings.HasPrefix(relative, "..")
+	name := filepath.Base(relative)
+	return err == nil && (name == "iris" || name == "spynel") && len(strings.Split(relative, string(filepath.Separator))) == 2 && !strings.HasPrefix(relative, "..")
 }
 
 func (m *Manager) stopProcesses(ctx context.Context, root string) error {

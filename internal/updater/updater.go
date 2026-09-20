@@ -165,6 +165,10 @@ func npmRootFromExecutable(executable string) string {
 }
 
 func validNPMRoot(root, currentVersion string) bool {
+	return validNPMRootPackage(root, currentVersion, "@edheltzel/iris")
+}
+
+func validNPMRootPackage(root, currentVersion, packageName string) bool {
 	if root == "" {
 		return false
 	}
@@ -173,7 +177,7 @@ func validNPMRoot(root, currentVersion string) bool {
 		return false
 	}
 	var metadata packageMetadata
-	if json.Unmarshal(data, &metadata) != nil || metadata.Name != "@edheltzel/iris" {
+	if json.Unmarshal(data, &metadata) != nil || metadata.Name != packageName {
 		return false
 	}
 	markerData, err := os.ReadFile(filepath.Join(root, "npm", "vendor", ".installed.json"))

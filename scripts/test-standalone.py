@@ -184,6 +184,14 @@ def main():
             old_output = subprocess.run([str(legacy_launcher), "--version"], cwd=workspace, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
             assert old_output.returncode == 0 and old_output.stdout.strip() == "spynel " + old_version, old_output.stderr
             assert (old_executable.parent / "licenses" / "onnxruntime" / "LICENSE").is_file()
+            conflicting_iris = user_bin / "iris"
+            conflicting_iris.write_text("preserve this executable\n")
+            rejected = subprocess.run(["sh"], input=script, cwd=workspace, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+            assert rejected.returncode != 0, "legacy installation switched before launcher conflict rejection"
+            assert conflicting_iris.read_text() == "preserve this executable\n"
+            assert legacy_launcher.resolve() == old_executable
+            assert (user_bin / "spynel").resolve() == old_executable
+            conflicting_iris.unlink()
             assert fixture["checks"] == 0, "noninteractive bootstrap checked for updates"
             subprocess.run([str(legacy_launcher), "init", "--no-start", "--dir", str(workspace)], cwd=workspace, env=env, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
             config = workspace / ".spynel" / "config.yaml"
@@ -309,7 +317,7 @@ def main():
             units = user_home / ".config" / "systemd" / "user" if target_os == "linux" else user_home / "Library" / "LaunchAgents"
             if target_os == "linux":
                 units.mkdir(parents=True)
-                for number, launcher in enumerate((install / "iris", npm_vendor / "iris")):
+                for number, launcher in enumerate((install / "iris", install / "spynel", npm_vendor / "iris")):
                     unit = units / f"spynel-{number:08d}.service"
                     unit.write_text('[Service]\nExecStart=:' + json.dumps(str(launcher), ensure_ascii=False) + ' "serve" "--automatic-startup"\n')
                 (units / "default.target.wants").mkdir()

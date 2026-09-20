@@ -84,6 +84,12 @@ main() {
       sudo mkdir -p "$bin_dir"
       bin_sudo=sudo
     fi
+    if [ -e "$bin_dir/iris" ] || [ -L "$bin_dir/iris" ]; then
+      if [ ! -L "$bin_dir/iris" ] || [ "$(readlink "$bin_dir/iris" 2>/dev/null || true)" != "$install_root/iris" ]; then
+        echo "Preserved the existing $bin_dir/iris. Run: \"$install_root/iris\""
+        return 1
+      fi
+    fi
   fi
   stage=$(mktemp -d "${TMPDIR:-/tmp}/iris-install.XXXXXXXX")
   trap 'rm -rf "$stage"' 0

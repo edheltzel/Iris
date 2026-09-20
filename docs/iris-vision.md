@@ -4,7 +4,7 @@ This in-repo file (`docs/iris-vision.md`) is the living Iris scope/spec SoT. `bo
 
 **Kind:** Product vision + conversion spec (report only — no code, no PR)  
 **Date:** 2026-09-17 (America/New_York)  
-**Amended:** FM-555 exceed inventory; **FM-558** blinking-eyeball UX; **FM-559** fork home `edheltzel/Iris`; **FM-560** Phase 1 rename CLI/binary/package `spynel` → `iris`; **FM-561** `~/.iris` + one-shot migrate; **FM-562** hard cut no `spynel` binary/alias; **FM-563** Go module/imports → iris; **FM-564** Phase 2 starts with GitButler `but`; **FM-565** then no-mistakes; **FM-566** full Phase 2 order; **FM-567** TG/WA optional side channels; **FM-568** BigMac `~/Developer/Iris`; **FM-569** npm → iris; **FM-570** dual-track Sentinel; **FM-571** cutover parked + npm install; **FM-572** OMP first-run docs; **FM-573** `@edheltzel/iris`; **FM-574** Iris room `f57aa087`; **FM-575** Jev intent; **FM-576** Phase 2 step (4) Jev/Typesafe routing; **Brainstorm-0919** Jev seats triage+notify → Sentinel#50  
+**Amended:** FM-555 exceed inventory; **FM-558** blinking-eyeball UX; **FM-559** fork home `edheltzel/Iris`; **FM-560** Phase 1 rename CLI/binary/package `spynel` → `iris`; **FM-561** workspace `.spynel/` retained + OS state migrated to `$HOME/.agents/Iris`; **FM-562** hard cut no `spynel` binary/alias; **FM-563** Go module/imports → iris; **FM-564** Phase 2 starts with GitButler `but`; **FM-565** then no-mistakes; **FM-566** full Phase 2 order; **FM-567** TG/WA optional side channels; **FM-568** BigMac `~/Developer/Iris`; **FM-569** npm → iris; **FM-570** dual-track Sentinel; **FM-571** cutover parked + npm install; **FM-572** OMP first-run docs; **FM-573** `@edheltzel/iris`; **FM-574** Iris room `f57aa087`; **FM-575** Jev intent; **FM-576** Phase 2 step (4) Jev/Typesafe routing; **Brainstorm-0919** Jev seats triage+notify → Sentinel#50
 **Upstream:** FM-543 (dual-track), FM-551 (extensibility), FM-554 (exceed inventory), Sentinel [#49](https://github.com/edheltzel/Sentinel/issues/49)  
 **Checkout (BigMac):** `/Users/ed/Developer/Iris` (**FM-568** — renamed from Spynel). Remotes: `origin=edheltzel/Iris`, `upstream=agent0ai/spynel` (push disabled), `old-spynel=edheltzel/spynel`  
 **Rename:** destination product = **Iris** (Spynel-base fork/adapt). Upstream remains Spynel until fork exists.
@@ -140,9 +140,9 @@ GitHub track (Iris issues disabled): [Sentinel#50](https://github.com/edheltzel/
 | --- | --- |
 | **Product name** | **Iris** everywhere captain-facing and in factory docs |
 | **BigMac checkout** | **Locked (FM-568):** `/Users/ed/Developer/Iris` (was Spynel). Remotes unchanged: origin Iris, upstream agent0ai/spynel, old-spynel |
-| **Binary / CLI / npm package** | **Locked (FM-560 + FM-562 + FM-569):** Phase 1 renames **`spynel` → `iris`** including **npm package name(s)**. **Hard cut** — no `spynel` binary/alias. Same rename ship as Go module + `~/.iris` |
+| **Binary / CLI / npm package** | **Locked (FM-560 + FM-562 + FM-569):** Phase 1 renames **`spynel` → `iris`** including **npm package name(s)**. **Hard cut** — no `spynel` binary/alias. Same rename ship as the Go module and OS-state path split |
 | **Go module / imports** | **Locked (FM-563):** Phase 1 renames Go module path + imports to **iris** in the **same** rename ship as CLI/npm/config (not a follow-up epic) |
-| **Config / data dir** | **Locked (FM-561):** Phase 1 renames Spynel home (e.g. `~/.spynel` or documented equivalent) → **`~/.iris`**, with a **one-shot migrate** of existing config/data. Prefer detect-old → copy/move → write new paths; do not strand users on the old dir |
+| **Workspace / OS state** | **Locked (FM-561):** workspace config and data stay in **`.spynel/`**. Installation identity, process records, and speech models live under **`$HOME/.agents/Iris`**, with a one-shot migration from legacy `UserConfigDir` / `UserCacheDir` `iris` or `spynel` directories. Do not migrate workspace config to a user-global Iris directory |
 | **Hooks / env** | Track Spynel hook names (`SPYNEL_HOOK`, `.spynel-extension.yaml`) until a thin rename pass; do not block hooks on rebrand |
 | **Docs / VISION** | This file + later `VISION.md` in the Iris repo once minted |
 | **GitHub** | **Locked:** `edheltzel/Iris` (FM-559). Atlas creates/retargets; leave mint to Atlas |
@@ -267,7 +267,7 @@ Dual track always: **Sentinel ships continue** on their own FM ids. Iris phases 
 - Thin fork from `agent0ai/spynel` already live as `edheltzel/Iris`. BigMac path: **`/Users/ed/Developer/Iris`** (FM-568).
 - **Rename locked (FM-560 / FM-561 / FM-562 / FM-563 / FM-569 / grill 2026-09-18):** Phase 1 ships **one rename ship** (or tightly stacked thin PRs) covering (one rename ship):
   1. **CLI / binary / npm package** `spynel` → **`iris`** (FM-560 + **FM-569** npm).
-  2. **Config / data dir** Spynel home (e.g. `~/.spynel` or documented equivalent) → **`~/.iris`**, with a **one-shot migrate** of existing config/data (FM-561): detect old dir → migrate → new paths; do not strand users.
+  2. **Workspace / OS state (FM-561):** keep workspace config and data in **`.spynel/`**. Put installation identity, process records, and speech models under **`$HOME/.agents/Iris`**, with a one-shot migration from legacy `UserConfigDir` / `UserCacheDir` `iris` or `spynel` directories.
   3. **Hard cut (FM-562):** after Phase 1 lands, there is **no** `spynel` binary and **no** `spynel` alias/compat shim — callers use `iris` only.
   4. **Go module / import paths (FM-563):** rename module + imports to **iris** in that **same** Phase 1 rename ship — not a later epic.
   Prefer thin rename-focused PR(s) on the Iris tip — do **not** defer past Phase 1. Hook env names (e.g. `SPYNEL_HOOK`) may follow in the same or next thin PR; leftover `SPYNEL_*` env strings are not a license to keep a `spynel` binary/alias or old Go module path.
@@ -311,7 +311,7 @@ Smallest ships, one concern each. **Order locked (grill 2026-09-18):**
 | --- | --- | --- |
 | 1 | **Iris GitHub owner / repo name?** | **Locked:** `edheltzel/Iris` (grill 2026-09-18 / FM-559). Atlas creates/retargets. |
 | 2 | Binary name: `iris` vs keep `spynel` until cutover? | **Locked (FM-560):** rename to `iris` in Phase 1 (CLI/binary/package) |
-| 2b | Config/data dir + migrate | **Locked (FM-561):** `~/.iris` + one-shot migrate from Spynel home |
+| 2b | Workspace / OS state split | **Locked (FM-561):** workspace stays `.spynel/`; identity, processes, and speech use `$HOME/.agents/Iris` with one-shot legacy user-dir migration |
 | 2c | Keep `spynel` alias after rename? | **Locked (FM-562):** hard cut — no binary/alias |
 | 2d | Defer Go module rename? | **Locked (FM-563):** same Phase 1 ship as CLI/config |
 | 2e | Defer npm package rename? | **Locked (FM-569):** same Phase 1 ship as CLI/Go/config |
@@ -344,7 +344,7 @@ Phase 0 is **done** when all of the following are true:
 5. Fork home is locked as `edheltzel/Iris` (FM-559); **create/retarget left to Atlas** — Intern does not invent remotes.
 6. Atlas has tips against **FM-553** / **FM-555**; captain can accept Phase 0 from this file.
 
-**Phase 0 exit → Phase 1:** fork home locked (`edheltzel/Iris`); Atlas creates/retargets; Phase 1 rename ship: CLI/binary/**npm** → `iris` / publish **`@edheltzel/iris`** (FM-560+569+**573**), `~/.iris` + one-shot migrate (FM-561), hard cut no `spynel` binary/alias (FM-562), Go module/imports → iris (FM-563).
+**Phase 0 exit → Phase 1:** fork home locked (`edheltzel/Iris`); Atlas creates/retargets; Phase 1 rename ship: CLI/binary/**npm** → `iris` / publish **`@edheltzel/iris`** (FM-560+569+**573**), workspace `.spynel/` retained with OS state migrated to `$HOME/.agents/Iris` (FM-561), hard cut no `spynel` binary/alias (FM-562), Go module/imports → iris (FM-563).
 
 ---
 
@@ -359,4 +359,3 @@ Phase 0 is **done** when all of the following are true:
 | Wait / notify / no-mistakes / Grok Bot | Sentinel #43 · #44 · #45 · #16 |
 | Upstream Spynel | https://github.com/agent0ai/spynel |
 | BigMac checkout | `/Users/ed/Developer/Iris` (FM-568) |
-
