@@ -138,6 +138,14 @@ func InstallArchive(ctx context.Context, root, archive, checksums, version strin
 	if err := privateDirectory(filepath.Join(root, "releases")); err != nil {
 		return "", err
 	}
+	legacyLauncher := filepath.Join(root, "spynel")
+	if target, err := os.Readlink(legacyLauncher); err == nil {
+		if target != "current/spynel" {
+			return "", errors.New("refusing to replace an unrelated legacy launcher")
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", errors.New("refusing to replace an unrelated legacy executable")
+	}
 	launcher := filepath.Join(root, "iris")
 	if target, err := os.Readlink(launcher); err == nil {
 		if target != "current/iris" {
@@ -202,6 +210,9 @@ func InstallArchive(ctx context.Context, root, archive, checksums, version strin
 		return "", err
 	}
 	if err := os.Rename(link, current); err != nil {
+		return "", err
+	}
+	if err := os.Remove(legacyLauncher); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return "", err
 	}
 	return launcher, nil

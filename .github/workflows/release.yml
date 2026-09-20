@@ -89,7 +89,7 @@ jobs:
           RELEASE_TAG: ${{ github.event.release.tag_name || inputs.version }}
         run: ./scripts/package-native.sh "$RELEASE_TAG" "${{ matrix.os }}" "${{ matrix.arch }}" release
 
-      - name: Verify native install and uninstall commands
+      - name: Verify Spynel-to-Iris upgrade and native installation
         shell: bash
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name || inputs.version }}

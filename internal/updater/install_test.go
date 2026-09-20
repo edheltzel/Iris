@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -195,6 +196,47 @@ func TestInstallRetainsWorkingBundleAndRejectsInvalidCandidates(t *testing.T) {
 	}
 	if _, err := InstallArchive(ctx, unmanaged, archive, sums, "1.2.0"); err == nil {
 		t.Fatal("adopted unmanaged directory")
+	}
+}
+
+func TestInstallReplacesOwnedLegacyLauncher(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("standalone distribution excludes Windows")
+	}
+	root := filepath.Join(t.TempDir(), "installation")
+	legacyBundle := filepath.Join(root, "releases", "0.12.1-legacy")
+	if err := os.MkdirAll(legacyBundle, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	marker, err := json.Marshal(bundleMetadata{Version: "0.12.1", OS: runtime.GOOS, Arch: runtime.GOARCH})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, data := range map[string][]byte{
+		filepath.Join(root, ".spynel-install"):      []byte(ownershipMarker),
+		filepath.Join(legacyBundle, ".bundle.json"): append(marker, '\n'),
+		filepath.Join(legacyBundle, "spynel"):       []byte("legacy"),
+	} {
+		if err := os.WriteFile(path, data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(filepath.Join("releases", filepath.Base(legacyBundle)), filepath.Join(root, "current")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("current/spynel", filepath.Join(root, "spynel")); err != nil {
+		t.Fatal(err)
+	}
+	archive, sums := candidateArchive(t, "1.2.0", nil, nil)
+	launcher, err := InstallArchive(context.Background(), root, archive, sums, "1.2.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(filepath.Join(root, "spynel")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("legacy launcher remains: %v", err)
+	}
+	if output, err := exec.Command(launcher, "--version").CombinedOutput(); err != nil || strings.TrimSpace(string(output)) != "iris 1.2.0" {
+		t.Fatalf("Iris launcher output = %q, err = %v", output, err)
 	}
 }
 

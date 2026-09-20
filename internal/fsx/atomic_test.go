@@ -55,3 +55,33 @@ func TestMigrateDirFallsBackWhenRenameFails(t *testing.T) {
 		t.Fatalf("migrated mode = %v, err = %v", info, err)
 	}
 }
+
+func TestMigrateDirAcceptsConcurrentCopyWinner(t *testing.T) {
+	source := filepath.Join(t.TempDir(), "legacy")
+	dest := filepath.Join(t.TempDir(), "current")
+	if err := os.Mkdir(source, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	originalRename := renameDirectory
+	originalCopy := copyMigrationDirectory
+	renameDirectory = func(string, string) error { return syscall.EXDEV }
+	copyMigrationDirectory = func(string, string) error {
+		if err := os.Mkdir(dest, 0o700); err != nil {
+			return err
+		}
+		if err := os.RemoveAll(source); err != nil {
+			return err
+		}
+		return &os.PathError{Op: "open", Path: source, Err: syscall.ENOENT}
+	}
+	t.Cleanup(func() {
+		renameDirectory = originalRename
+		copyMigrationDirectory = originalCopy
+	})
+	if err := MigrateDir(dest, source); err != nil {
+		t.Fatal(err)
+	}
+	if info, err := os.Stat(dest); err != nil || !info.IsDir() {
+		t.Fatalf("published destination = %v, err = %v", info, err)
+	}
+}

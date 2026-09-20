@@ -117,6 +117,9 @@ main() {
     echo "Preserved the existing $bin_dir/iris. Run: \"$install_root/iris\""
     return 1
   fi
+  if [ -L "$bin_dir/spynel" ] && [ "$(readlink "$bin_dir/spynel" 2>/dev/null || true)" = "$install_root/spynel" ]; then
+    $bin_sudo rm -f "$bin_dir/spynel"
+  fi
   printf '%s\n' "$bin_dir" > "$install_root/.bin-dir"
   quoted_bin=$(shell_quote "$bin_dir")
   path_line="case \":\$PATH:\" in *:$quoted_bin:*) ;; *) export PATH=$quoted_bin:\$PATH ;; esac # Iris installer"

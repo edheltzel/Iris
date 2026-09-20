@@ -7,7 +7,10 @@ import (
 	"path/filepath"
 )
 
-var renameDirectory = os.Rename
+var (
+	renameDirectory        = os.Rename
+	copyMigrationDirectory = copyDirectory
+)
 
 // AtomicWriteFile durably writes a temporary sibling and replaces path with it.
 func AtomicWriteFile(path string, data []byte, mode os.FileMode) error {
@@ -111,7 +114,10 @@ func MigrateDir(dest string, sources ...string) error {
 				_ = os.RemoveAll(temp)
 			}
 		}()
-		if err := copyDirectory(source, temp); err != nil {
+		if err := copyMigrationDirectory(source, temp); err != nil {
+			if _, destErr := os.Lstat(dest); destErr == nil {
+				return nil
+			}
 			return err
 		}
 		if err := renameDirectory(temp, dest); err != nil {
