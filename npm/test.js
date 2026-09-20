@@ -10,7 +10,7 @@ const { once } = require("events");
 const { resolve } = require("./platform");
 const { install, validateArchiveEntries, validateExtractedTree } = require("./install");
 const { prepareRelease, releaseMetadata, rewriteReadme } = require("./prepare-release");
-const { STARTUP_PROMPT_TIMEOUT_MS, checkForUpdate, compareVersions, promptForStartupUpdate, shouldCheckAtStartup } = require("./update");
+const { STARTUP_PROMPT_TIMEOUT_MS, checkForUpdate, compareVersions, npmInvocation, promptForStartupUpdate, shouldCheckAtStartup } = require("./update");
 const { createLaunchEnvironment } = require("./bin/iris");
 const pkg = require("../package.json");
 
@@ -98,6 +98,10 @@ for (const required of ["bin/iris.js", "install.js", "platform.js", "update.js"]
 assert(compareVersions("1.3.0", "1.2.9") > 0);
 assert(compareVersions("1.0.0", "1.0.0-rc.1") > 0);
 assert(compareVersions("1.0.0-beta.2", "1.0.0-beta.11") < 0);
+assert.deepStrictEqual(
+  npmInvocation(path.join(__dirname, ".test-project", "node_modules", "@edheltzel", "iris")).args,
+  ["update", "@edheltzel/iris", "--prefix", path.join(__dirname, ".test-project")],
+);
 assert.strictEqual(shouldCheckAtStartup(["serve", "--automatic-startup"], { isTTY: true }, { isTTY: true }, {}), false);
 assert.strictEqual(shouldCheckAtStartup(["version"], { isTTY: true }, { isTTY: true }, {}), false);
 assert.strictEqual(shouldCheckAtStartup([], { isTTY: true }, { isTTY: true }, {}), true);

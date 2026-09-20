@@ -138,7 +138,8 @@ function npmInvocation(packageRoot = path.resolve(__dirname, "..")) {
   if (globalRoot && samePath(packageRoot, path.join(globalRoot, pkg.name))) {
     return { command: npm, args: ["update", "--global", pkg.name], display: `npm update --global ${pkg.name}` };
   }
-  const nodeModules = path.dirname(packageRoot);
+  const packageParent = path.dirname(packageRoot);
+  const nodeModules = path.basename(packageParent).startsWith("@") ? path.dirname(packageParent) : packageParent;
   const prefix = path.basename(nodeModules) === "node_modules" ? path.dirname(nodeModules) : process.cwd();
   return { command: npm, args: ["update", pkg.name, "--prefix", prefix], display: `npm update ${pkg.name}` };
 }

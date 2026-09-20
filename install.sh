@@ -11,7 +11,19 @@ main() {
   esac
   [ "$#" -le 1 ] || { echo 'Usage: install.sh' >&2; exit 2; }
   : "${HOME:?HOME must identify your user directory}"
-  install_root=${SPYNEL_INSTALL_DIR:-"$HOME/.local/share/iris"}
+  if [ "${SPYNEL_INSTALL_DIR+x}" = x ]; then
+    install_root=$SPYNEL_INSTALL_DIR
+  else
+    install_root="$HOME/.local/share/iris"
+    legacy_root="$HOME/.local/share/spynel"
+    legacy_marker=
+    if [ -f "$legacy_root/.spynel-install" ]; then
+      IFS= read -r legacy_marker < "$legacy_root/.spynel-install" || true
+    fi
+    if [ "$legacy_marker" = spynel-github-v1 ]; then
+      install_root=$legacy_root
+    fi
+  fi
   case "$install_root" in /*) ;; *) echo 'SPYNEL_INSTALL_DIR must be absolute.' >&2; exit 1 ;; esac
   while [ "${install_root%/}" != "$install_root" ] && [ "$install_root" != / ]; do install_root=${install_root%/}; done
   case "$install_root" in *'
