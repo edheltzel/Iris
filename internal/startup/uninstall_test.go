@@ -241,3 +241,75 @@ func TestMigrateInstallation(t *testing.T) {
 		})
 	}
 }
+
+func TestMigrateInstallationRollbackReloadsAfterCancellation(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("standalone distribution excludes Windows")
+	}
+	home := t.TempDir()
+	oldExecutable := filepath.Join(home, "installation", "spynel")
+	newExecutable := filepath.Join(home, "installation", "iris")
+	for _, path := range []string{oldExecutable, newExecutable} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("#!/bin/sh\n"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	manager := &Manager{
+		GOOS:       "darwin",
+		Home:       home,
+		Executable: oldExecutable,
+		RunCommand: func(_ context.Context, name string, args ...string) (string, error) {
+			if name == "launchctl" && args[0] == "print-disabled" {
+				return "disabled services = {\n}\n", nil
+			}
+			return "", nil
+		},
+	}
+	cfg := startupTestConfig(t, filepath.Join(home, "workspace"))
+	if err := manager.Sync(cfg, true); err != nil {
+		t.Fatal(err)
+	}
+	registration := filepath.Join(home, "Library", "LaunchAgents", "dev.spynel.workspace."+workspaceID(cfg)+".plist")
+	before, err := os.ReadFile(registration)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	bootouts := 0
+	rollbackBootstrapped := false
+	manager.RunCommand = func(commandCtx context.Context, name string, args ...string) (string, error) {
+		if name == "launchctl" && args[0] == "bootout" {
+			bootouts++
+			if bootouts == 1 {
+				cancel()
+			}
+			return "", nil
+		}
+		if name == "launchctl" && args[0] == "bootstrap" {
+			if err := commandCtx.Err(); err != nil {
+				return "", err
+			}
+			rollbackBootstrapped = true
+		}
+		return "", nil
+	}
+	err = manager.MigrateInstallation(ctx, oldExecutable, newExecutable)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("migration error = %v, want context cancellation", err)
+	}
+	after, err := os.ReadFile(registration)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(after, before) {
+		t.Fatal("rollback did not restore the original launchd registration")
+	}
+	if bootouts != 2 || !rollbackBootstrapped {
+		t.Fatalf("rollback reload = bootouts %d, bootstrapped %t", bootouts, rollbackBootstrapped)
+	}
+}

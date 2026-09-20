@@ -208,7 +208,81 @@ fs.writeFileSync("package.json", JSON.stringify({name: "@edheltzel/iris", versio
   }
 }
 
+function checkLegacyGlobalCleanup() {
+  const directory = fs.mkdtempSync(path.join(require("os").tmpdir(), "iris-legacy-npm-"));
+  try {
+    const globalRoot = path.join(directory, "node_modules");
+    const packageRoot = path.join(globalRoot, "@edheltzel", "iris");
+    const npmDirectory = path.join(packageRoot, "npm");
+    const vendor = path.join(npmDirectory, "vendor");
+    const legacyRoot = path.join(globalRoot, "spynel");
+    const tools = path.join(directory, "tools");
+    const log = path.join(directory, "calls");
+    fs.mkdirSync(vendor, { recursive: true });
+    fs.mkdirSync(legacyRoot, { recursive: true });
+    fs.mkdirSync(tools);
+    for (const file of ["install.js", "platform.js"]) {
+      fs.copyFileSync(path.join(__dirname, file), path.join(npmDirectory, file));
+    }
+    fs.copyFileSync(path.join(__dirname, "..", "package.json"), path.join(packageRoot, "package.json"));
+    const target = resolve(process.platform, process.arch);
+    fs.writeFileSync(path.join(vendor, "iris"), "binary");
+    fs.writeFileSync(path.join(vendor, ".installed.json"), JSON.stringify({ version: pkg.version, os: target.os, arch: target.arch }));
+    fs.writeFileSync(path.join(tools, "npm"), `#!${process.execPath}
+const fs = require("fs");
+const args = process.argv.slice(2);
+fs.appendFileSync(process.env.LEGACY_NPM_LOG, args.join(" ") + "\\n");
+if (args.join(" ") === "root --global") {
+  console.log(process.env.LEGACY_NPM_ROOT);
+} else if (args.join(" ") === "uninstall --global spynel") {
+  fs.rmSync(process.env.LEGACY_NPM_PACKAGE, {recursive: true, force: true});
+} else {
+  process.exitCode = 2;
+}
+`, { mode: 0o700 });
+    const environment = {
+      ...process.env,
+      PATH: tools + path.delimiter + process.env.PATH,
+      LEGACY_NPM_LOG: log,
+      LEGACY_NPM_ROOT: globalRoot,
+      LEGACY_NPM_PACKAGE: legacyRoot,
+    };
+    const runInstall = () => spawnSync(process.execPath, [path.join(npmDirectory, "install.js")], {
+      cwd: packageRoot,
+      encoding: "utf8",
+      env: environment,
+    });
+
+    fs.writeFileSync(path.join(legacyRoot, "package.json"), JSON.stringify({
+      name: "spynel",
+      repository: { type: "git", url: "git+https://github.com/agent0ai/spynel.git" },
+      bin: { spynel: "npm/bin/spynel.js" },
+    }));
+    let result = runInstall();
+    assert.ifError(result.error);
+    assert.strictEqual(result.status, 0, result.stderr);
+    assert.strictEqual(fs.existsSync(legacyRoot), false);
+    assert.strictEqual(fs.readFileSync(log, "utf8"), "root --global\nuninstall --global spynel\n");
+
+    fs.mkdirSync(legacyRoot);
+    fs.writeFileSync(path.join(legacyRoot, "package.json"), JSON.stringify({
+      name: "spynel",
+      repository: { type: "git", url: "https://example.com/unrelated.git" },
+      bin: { spynel: "npm/bin/spynel.js" },
+    }));
+    fs.writeFileSync(log, "");
+    result = runInstall();
+    assert.ifError(result.error);
+    assert.strictEqual(result.status, 0, result.stderr);
+    assert.strictEqual(fs.existsSync(legacyRoot), true);
+    assert.strictEqual(fs.readFileSync(log, "utf8"), "root --global\n");
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+}
+
 async function main() {
+  checkLegacyGlobalCleanup();
   checkLauncherUpdates();
   await checkLauncherSignals();
   const platformDescriptor = Object.getOwnPropertyDescriptor(process, "platform");

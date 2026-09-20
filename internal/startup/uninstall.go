@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/edheltzel/iris/internal/fsx"
 )
@@ -106,6 +107,8 @@ type changedRegistration struct {
 }
 
 func (m *Manager) rollbackMigration(ctx context.Context, changed []changedRegistration, cause error) error {
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
 	errorsFound := []error{cause}
 	reload := make(map[bool]bool)
 	for index := len(changed) - 1; index >= 0; index-- {
@@ -115,7 +118,7 @@ func (m *Manager) rollbackMigration(ctx context.Context, changed []changedRegist
 			continue
 		}
 		if m.GOOS == "darwin" && registration.loaded {
-			if _, err := m.reloadLaunchdRegistration(ctx, registration.path, registration.system, true); err != nil {
+			if _, err := m.reloadLaunchdRegistration(cleanupCtx, registration.path, registration.system, true); err != nil {
 				errorsFound = append(errorsFound, err)
 			}
 		}
@@ -125,7 +128,7 @@ func (m *Manager) rollbackMigration(ctx context.Context, changed []changedRegist
 	}
 	if m.GOOS == "linux" {
 		for system := range reload {
-			if err := m.reloadMigratedRegistrations(ctx, system); err != nil {
+			if err := m.reloadMigratedRegistrations(cleanupCtx, system); err != nil {
 				errorsFound = append(errorsFound, err)
 			}
 		}
