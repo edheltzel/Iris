@@ -221,7 +221,12 @@ func processRecords(ids []int) ([]ProcessRegistration, error) {
 			if err != nil {
 				info, err = buildinfo.ReadFile(record.Executable)
 			}
-			if err == nil && (info.Path == own.Path || info.Path == legacyProcessModule && legacyProcessOwned(record, path)) {
+			if err == nil && info.Path == own.Path {
+				records = append(records, record)
+				continue
+			}
+			if err == nil && info.Path == legacyProcessModule && legacyProcessOwned(record, path) {
+				record.Generation = ""
 				records = append(records, record)
 				continue
 			}

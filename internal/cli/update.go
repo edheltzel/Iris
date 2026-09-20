@@ -12,8 +12,24 @@ import (
 	"syscall"
 
 	"github.com/edheltzel/iris/internal/core"
+	"github.com/edheltzel/iris/internal/startup"
 	"github.com/edheltzel/iris/internal/updater"
 )
+
+func updateManager(version string) *updater.Manager {
+	manager := updater.Detect(version)
+	manager.MigrateLegacyStartup = migrateLegacyStartup
+	return manager
+}
+
+func migrateLegacyStartup(ctx context.Context, from, to string) error {
+	manager, err := startup.New(to)
+	if err != nil {
+		return err
+	}
+	manager.NPMLauncher = ""
+	return manager.MigrateInstallation(ctx, from, to)
+}
 
 // The shell update command operates on its installation, independently of
 // whichever workspace or older primary happens to be in the current directory.
@@ -29,7 +45,7 @@ func runUpdateCommand(args []string, version string) error {
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	manager := updater.Detect(version)
+	manager := updateManager(version)
 	result, err := manager.Check(ctx)
 	if err != nil {
 		return err

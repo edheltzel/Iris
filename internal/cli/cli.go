@@ -1135,7 +1135,7 @@ func buildService(cfg config.Config, version string) (*app.Service, error) {
 		Version: version, Stderr: runtimeState.Writer("harness"),
 	})
 	service := app.NewWithRuntime(cfg, target, runtimeState)
-	service.Updates = updater.Detect(version)
+	service.Updates = updateManager(version)
 	startup, err := startupmanager.New("")
 	if err != nil {
 		service.Runtime.LogEvent("error", "startup", "manager_failed", "Startup manager initialization failed")
@@ -1414,7 +1414,7 @@ func runInstallBundle(args []string, buildVersion string) error {
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	_, err := updater.InstallArchive(ctx, *root, *archive, *checksums, *version)
+	_, err := updater.InstallArchive(ctx, *root, *archive, *checksums, *version, migrateLegacyStartup)
 	return err
 }
 

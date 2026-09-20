@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/edheltzel/iris/internal/fsx"
 )
 
 // RemoveInstallation stops and removes only registrations for this executable
@@ -22,6 +24,171 @@ func (m *Manager) RemoveInstallation(ctx context.Context, userID int) error {
 // StopInstallation unloads services without changing future startup settings.
 func (m *Manager) StopInstallation(ctx context.Context, userID int) error {
 	return m.stopInstallation(ctx, userID, false)
+}
+
+func (m *Manager) MigrateInstallation(ctx context.Context, from, to string) error {
+	from, to = filepath.Clean(from), filepath.Clean(to)
+	fromName, toName := filepath.Base(from), filepath.Base(to)
+	if !filepath.IsAbs(from) || !filepath.IsAbs(to) || filepath.Dir(from) != filepath.Dir(to) ||
+		!((fromName == "spynel" && toName == "iris") || (fromName == "iris" && toName == "spynel")) {
+		return errors.New("startup migration requires exact sibling iris and spynel launchers")
+	}
+	var changed []changedRegistration
+	scopes := []bool{false}
+	if m.SystemWide {
+		scopes = append(scopes, true)
+	}
+	for _, system := range scopes {
+		directory := filepath.Join(m.Home, ".config", "systemd", "user")
+		pattern := "spynel-????????.service"
+		if m.GOOS == "darwin" {
+			directory = filepath.Join(m.Home, "Library", "LaunchAgents")
+			pattern = "dev.spynel.workspace.????????.plist"
+		}
+		if system {
+			directory = m.SystemUnitDirectory
+			if m.GOOS == "darwin" {
+				directory = m.SystemLaunchDirectory
+			}
+		}
+		paths, err := filepath.Glob(filepath.Join(directory, pattern))
+		if err != nil {
+			return m.rollbackMigration(ctx, changed, err)
+		}
+		if len(paths) > 4096 {
+			return m.rollbackMigration(ctx, changed, errors.New("too many startup registrations to inspect safely"))
+		}
+		for _, path := range paths {
+			data, err := readRegistration(path)
+			if err != nil {
+				return m.rollbackMigration(ctx, changed, err)
+			}
+			updated, matches, err := migratedRegistration(data, m.GOOS, from, to)
+			if err != nil {
+				return m.rollbackMigration(ctx, changed, err)
+			}
+			if !matches {
+				continue
+			}
+			if err := m.writeMigratedRegistration(ctx, path, updated, system); err != nil {
+				return m.rollbackMigration(ctx, changed, err)
+			}
+			changed = append(changed, changedRegistration{path: path, data: data, system: system})
+		}
+	}
+	if m.GOOS == "linux" {
+		reloaded := make(map[bool]bool)
+		for _, registration := range changed {
+			if reloaded[registration.system] {
+				continue
+			}
+			if err := m.reloadMigratedRegistrations(ctx, registration.system); err != nil {
+				return m.rollbackMigration(ctx, changed, err)
+			}
+			reloaded[registration.system] = true
+		}
+	}
+	return nil
+}
+
+type changedRegistration struct {
+	path   string
+	data   []byte
+	system bool
+}
+
+func (m *Manager) rollbackMigration(ctx context.Context, changed []changedRegistration, cause error) error {
+	errorsFound := []error{cause}
+	reload := make(map[bool]bool)
+	for index := len(changed) - 1; index >= 0; index-- {
+		registration := changed[index]
+		if err := fsx.AtomicWriteFile(registration.path, registration.data, 0o600); err != nil {
+			errorsFound = append(errorsFound, err)
+		}
+		reload[registration.system] = true
+	}
+	if m.GOOS == "linux" {
+		for system := range reload {
+			if err := m.reloadMigratedRegistrations(ctx, system); err != nil {
+				errorsFound = append(errorsFound, err)
+			}
+		}
+	}
+	return errors.Join(errorsFound...)
+}
+
+func (m *Manager) writeMigratedRegistration(ctx context.Context, path string, data []byte, system bool) error {
+	if m.GOOS == "darwin" {
+		return m.writeValidated(ctx, path, data, "plutil", "-lint")
+	}
+	arguments := []string{"verify", "--man=no"}
+	if !system {
+		arguments = append(arguments, "--user")
+	}
+	return m.writeValidated(ctx, path, data, "systemd-analyze", arguments...)
+}
+
+func (m *Manager) reloadMigratedRegistrations(ctx context.Context, system bool) error {
+	runtimePath := filepath.Join("/run/user", strconv.Itoa(os.Getuid()))
+	managerPath := filepath.Join(runtimePath, "systemd", "private")
+	arguments := []string{"--no-ask-password", "--user", "daemon-reload"}
+	if value := os.Getenv("XDG_RUNTIME_DIR"); !system && value != "" {
+		managerPath = filepath.Join(value, "systemd", "private")
+	}
+	if system {
+		managerPath = "/run/systemd/system"
+		arguments = []string{"--no-ask-password", "daemon-reload"}
+	}
+	if _, err := os.Stat(managerPath); errors.Is(err, os.ErrNotExist) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	_, err := m.run(ctx, "systemctl", arguments...)
+	return err
+}
+
+func migratedRegistration(data []byte, goos, from, to string) ([]byte, bool, error) {
+	if goos == "linux" {
+		old := []byte("ExecStart=:" + systemdQuote(from) + " ")
+		if bytes.Count(data, old) == 0 {
+			return data, false, nil
+		}
+		if bytes.Count(data, old) != 1 {
+			return nil, false, errors.New("startup registration contains duplicate executable entries")
+		}
+		return bytes.Replace(data, old, []byte("ExecStart=:"+systemdQuote(to)+" "), 1), true, nil
+	}
+	if goos != "darwin" {
+		return nil, false, fmt.Errorf("startup migration is not supported on %s", goos)
+	}
+	arguments, err := launchdProgramArguments(data)
+	if err != nil || len(arguments) == 0 || arguments[0] != from {
+		return data, false, err
+	}
+	key := []byte("<key>ProgramArguments</key>")
+	start := bytes.Index(data, key)
+	if start < 0 {
+		return nil, false, errors.New("invalid launchd program arguments")
+	}
+	old, err := xml.Marshal(from)
+	if err != nil {
+		return nil, false, err
+	}
+	newValue, err := xml.Marshal(to)
+	if err != nil {
+		return nil, false, err
+	}
+	end := bytes.Index(data[start+len(key):], []byte("</array>"))
+	index := bytes.Index(data[start+len(key):], old)
+	if end < 0 || index < 0 || index >= end {
+		return nil, false, errors.New("invalid launchd program arguments")
+	}
+	index += start + len(key)
+	updated := append([]byte(nil), data[:index]...)
+	updated = append(updated, newValue...)
+	updated = append(updated, data[index+len(old):]...)
+	return updated, true, nil
 }
 
 func (m *Manager) stopInstallation(ctx context.Context, userID int, remove bool) error {
@@ -172,14 +339,19 @@ func (m *Manager) registrationMatches(data []byte) (bool, error) {
 		}
 		return false, nil
 	}
+	args, err := launchdProgramArguments(data)
+	return err == nil && (len(args) > 0 && args[0] == m.Executable || m.NPMLauncher != "" && len(args) > 1 && args[1] == m.NPMLauncher), err
+}
+
+func launchdProgramArguments(data []byte) ([]string, error) {
 	decoder := xml.NewDecoder(bytes.NewReader(data))
 	for {
 		token, err := decoder.Token()
 		if err == io.EOF {
-			return false, nil
+			return nil, nil
 		}
 		if err != nil {
-			return false, err
+			return nil, err
 		}
 		start, ok := token.(xml.StartElement)
 		if !ok || start.Name.Local != "key" {
@@ -187,7 +359,7 @@ func (m *Manager) registrationMatches(data []byte) (bool, error) {
 		}
 		var key string
 		if err := decoder.DecodeElement(&key, &start); err != nil {
-			return false, err
+			return nil, err
 		}
 		if key != "ProgramArguments" {
 			continue
@@ -196,9 +368,8 @@ func (m *Manager) registrationMatches(data []byte) (bool, error) {
 			Values []string `xml:"string"`
 		}
 		if err := decoder.Decode(&arguments); err != nil {
-			return false, err
+			return nil, err
 		}
-		args := arguments.Values
-		return len(args) > 0 && args[0] == m.Executable || m.NPMLauncher != "" && len(args) > 1 && args[1] == m.NPMLauncher, nil
+		return arguments.Values, nil
 	}
 }

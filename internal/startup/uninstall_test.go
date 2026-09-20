@@ -1,6 +1,7 @@
 package startup
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -134,5 +135,95 @@ func TestRemoveInstallation(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestMigrateInstallation(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("standalone distribution excludes Windows")
+	}
+	for _, platform := range []string{"linux", "darwin"} {
+		t.Run(platform, func(t *testing.T) {
+			home := t.TempDir()
+			runtimeDirectory := filepath.Join(home, "run")
+			t.Setenv("XDG_RUNTIME_DIR", runtimeDirectory)
+			if err := os.MkdirAll(filepath.Join(runtimeDirectory, "systemd", "private"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			install := filepath.Join(home, "installation")
+			oldExecutable := filepath.Join(install, "spynel")
+			newExecutable := filepath.Join(install, "iris")
+			unrelatedExecutable := filepath.Join(home, "other", "iris")
+			for _, path := range []string{oldExecutable, newExecutable, unrelatedExecutable} {
+				if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, []byte("#!/bin/sh\n"), 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			run := func(_ context.Context, name string, args ...string) (string, error) {
+				if name == "launchctl" && args[0] == "print-disabled" {
+					return "disabled services = {\n}\n", nil
+				}
+				if name == "systemctl" && strings.Contains(strings.Join(args, " "), "list-unit-files") {
+					return args[len(args)-1] + " enabled enabled\n", nil
+				}
+				return "", nil
+			}
+			manager := &Manager{GOOS: platform, Home: home, Executable: oldExecutable, SystemLaunchDirectory: filepath.Join(home, "system"), RunCommand: run}
+			cfg := startupTestConfig(t, filepath.Join(home, "workspace"))
+			if err := manager.Sync(cfg, true); err != nil {
+				t.Fatal(err)
+			}
+			unrelated := *manager
+			unrelated.Executable = unrelatedExecutable
+			otherConfig := startupTestConfig(t, filepath.Join(home, "other-workspace"))
+			if err := unrelated.Sync(otherConfig, true); err != nil {
+				t.Fatal(err)
+			}
+			directory := filepath.Join(home, ".config", "systemd", "user")
+			name := "spynel-" + workspaceID(cfg) + ".service"
+			otherName := "spynel-" + workspaceID(otherConfig) + ".service"
+			if platform == "darwin" {
+				directory = filepath.Join(home, "Library", "LaunchAgents")
+				name = "dev.spynel.workspace." + workspaceID(cfg) + ".plist"
+				otherName = "dev.spynel.workspace." + workspaceID(otherConfig) + ".plist"
+			}
+			otherPath := filepath.Join(directory, otherName)
+			otherBefore, err := os.ReadFile(otherPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := manager.MigrateInstallation(t.Context(), oldExecutable, newExecutable); err != nil {
+				t.Fatal(err)
+			}
+			data, err := os.ReadFile(filepath.Join(directory, name))
+			if err != nil {
+				t.Fatal(err)
+			}
+			newManager := *manager
+			newManager.Executable = newExecutable
+			if oldMatch, err := manager.registrationMatches(data); err != nil || oldMatch {
+				t.Fatalf("legacy registration still matches: %t %v", oldMatch, err)
+			}
+			if newMatch, err := newManager.registrationMatches(data); err != nil || !newMatch {
+				t.Fatalf("Iris registration does not match: %t %v", newMatch, err)
+			}
+			otherAfter, err := os.ReadFile(otherPath)
+			if err != nil || !bytes.Equal(otherAfter, otherBefore) {
+				t.Fatalf("unrelated registration changed: %v", err)
+			}
+			if err := manager.MigrateInstallation(t.Context(), newExecutable, oldExecutable); err != nil {
+				t.Fatal(err)
+			}
+			data, err = os.ReadFile(filepath.Join(directory, name))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if oldMatch, err := manager.registrationMatches(data); err != nil || !oldMatch {
+				t.Fatalf("legacy registration rollback does not match: %t %v", oldMatch, err)
+			}
+		})
 	}
 }

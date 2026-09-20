@@ -161,7 +161,7 @@ func TestProcessRecordCannotTargetAnUnrelatedExecutable(t *testing.T) {
 	}
 }
 
-func TestKillAllFindsOnlyInstallationOwnedLegacyProcess(t *testing.T) {
+func TestLegacyProcessIsStopOnlyAndInstallationOwned(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("HOME", t.TempDir())
 	root, err := filepath.EvalSymlinks(t.TempDir())
@@ -243,6 +243,12 @@ func main() { signals := make(chan os.Signal, 1); signal.Notify(signals, syscall
 			t.Fatal(err)
 		}
 		t.Cleanup(func() { _ = os.Remove(path) })
+	}
+	if err := (&Manager{InstallRoot: root}).CheckRestartable(); err == nil || !strings.Contains(err.Error(), "iris killall") {
+		t.Fatalf("legacy restart preflight: %v", err)
+	}
+	if err := owned.Process.Signal(syscall.Signal(0)); err != nil {
+		t.Fatal("legacy restart preflight stopped the process")
 	}
 	stop := errors.New("stop after discovery")
 	if _, err := KillAll(t.Context(), func(records []ProcessRegistration) error {

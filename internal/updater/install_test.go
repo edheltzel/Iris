@@ -85,7 +85,7 @@ func TestInstallRetainsWorkingBundleAndRejectsInvalidCandidates(t *testing.T) {
 	root := filepath.Join(parent, "installation with spaces Ω")
 	ctx := context.Background()
 	archive, sums := candidateArchive(t, "1.2.0", nil, nil)
-	launcher, err := InstallArchive(ctx, root, archive, sums, "1.2.0")
+	launcher, err := InstallArchive(ctx, root, archive, sums, "1.2.0", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestInstallRetainsWorkingBundleAndRejectsInvalidCandidates(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if _, err := InstallArchive(ctx, root, archive, sums, "1.3.0"); err == nil {
+			if _, err := InstallArchive(ctx, root, archive, sums, "1.3.0", nil); err == nil {
 				t.Fatal("accepted invalid candidate")
 			}
 			current, _ := filepath.EvalSymlinks(launcher)
@@ -152,7 +152,7 @@ func TestInstallRetainsWorkingBundleAndRejectsInvalidCandidates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := InstallArchive(ctx, root, archive, sums, "1.2.0"); err == nil {
+	if _, err := InstallArchive(ctx, root, archive, sums, "1.2.0", nil); err == nil {
 		t.Fatal("overlapping installation acquired lock")
 	}
 	unlock()
@@ -161,7 +161,7 @@ func TestInstallRetainsWorkingBundleAndRejectsInvalidCandidates(t *testing.T) {
 		t.Fatal(err)
 	}
 	archive, sums = candidateArchive(t, "1.3.0", nil, nil)
-	if _, err := InstallArchive(ctx, root, archive, sums, "1.3.0"); err != nil {
+	if _, err := InstallArchive(ctx, root, archive, sums, "1.3.0", nil); err != nil {
 		t.Fatal(err)
 	}
 	current, _ := filepath.EvalSymlinks(launcher)
@@ -187,14 +187,14 @@ func TestInstallRetainsWorkingBundleAndRejectsInvalidCandidates(t *testing.T) {
 		t.Fatal("ownership lost after update")
 	}
 	archive, sums = candidateArchive(t, "1.2.0", nil, nil)
-	if _, err := InstallArchive(ctx, root, archive, sums, "1.2.0"); err == nil {
+	if _, err := InstallArchive(ctx, root, archive, sums, "1.2.0", nil); err == nil {
 		t.Fatal("allowed downgrade")
 	}
 	unmanaged := t.TempDir()
 	if err := os.WriteFile(filepath.Join(unmanaged, "unrelated"), []byte("keep"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := InstallArchive(ctx, unmanaged, archive, sums, "1.2.0"); err == nil {
+	if _, err := InstallArchive(ctx, unmanaged, archive, sums, "1.2.0", nil); err == nil {
 		t.Fatal("adopted unmanaged directory")
 	}
 }
@@ -228,9 +228,34 @@ func TestInstallReplacesOwnedLegacyLauncher(t *testing.T) {
 		t.Fatal(err)
 	}
 	archive, sums := candidateArchive(t, "1.2.0", nil, nil)
-	launcher, err := InstallArchive(context.Background(), root, archive, sums, "1.2.0")
+	migrationFailure := errors.New("startup migration failed")
+	if _, err := InstallArchive(context.Background(), root, archive, sums, "1.2.0", func(context.Context, string, string) error {
+		return migrationFailure
+	}); !errors.Is(err, migrationFailure) {
+		t.Fatalf("migration failure = %v", err)
+	}
+	if target, err := os.Readlink(filepath.Join(root, "current")); err != nil || target != filepath.Join("releases", filepath.Base(legacyBundle)) {
+		t.Fatalf("current after migration failure = %q, %v", target, err)
+	}
+	if _, err := os.Lstat(filepath.Join(root, "spynel")); err != nil {
+		t.Fatal("legacy launcher lost after migration failure:", err)
+	}
+	if _, err := os.Lstat(filepath.Join(root, "iris")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("Iris launcher published after migration failure: %v", err)
+	}
+	migrated := false
+	launcher, err := InstallArchive(context.Background(), root, archive, sums, "1.2.0", func(_ context.Context, from, to string) error {
+		if from != filepath.Join(root, "spynel") || to != filepath.Join(root, "iris") {
+			t.Fatalf("startup migration = %q -> %q", from, to)
+		}
+		migrated = true
+		return nil
+	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !migrated {
+		t.Fatal("startup registration migration was skipped")
 	}
 	if _, err := os.Lstat(filepath.Join(root, "spynel")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("legacy launcher remains: %v", err)
@@ -246,7 +271,7 @@ func TestGitHubDiscoveryAndDownloadFailures(t *testing.T) {
 	}
 	archive, sums := candidateArchive(t, "1.2.0", nil, nil)
 	root := filepath.Join(t.TempDir(), "install")
-	if _, err := InstallArchive(context.Background(), root, archive, sums, "1.2.0"); err != nil {
+	if _, err := InstallArchive(context.Background(), root, archive, sums, "1.2.0", nil); err != nil {
 		t.Fatal(err)
 	}
 	next, nextSums := candidateArchive(t, "1.3.0", nil, nil)

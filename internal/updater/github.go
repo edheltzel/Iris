@@ -148,6 +148,6 @@ func (m *Manager) Install(ctx context.Context, version string) error {
 			return closeErr
 		}
 	}
-	_, err = InstallArchive(ctx, m.InstallRoot, filepath.Join(temp, archiveName(version)), filepath.Join(temp, "checksums.txt"), version)
+	_, err = InstallArchive(ctx, m.InstallRoot, filepath.Join(temp, archiveName(version)), filepath.Join(temp, "checksums.txt"), version, m.MigrateLegacyStartup)
 	return err
 }

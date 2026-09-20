@@ -98,7 +98,7 @@ func privateDirectory(directory string) error {
 // InstallArchive is also the verified bootstrap binary's installation boundary.
 // It never adopts a nonempty unmanaged directory, replaces an unrelated entry
 // point, or mutates a previously published bundle.
-func InstallArchive(ctx context.Context, root, archive, checksums, version string) (string, error) {
+func InstallArchive(ctx context.Context, root, archive, checksums, version string, migrateLegacyStartup func(context.Context, string, string) error) (string, error) {
 	version = strings.TrimPrefix(version, "v")
 	if !stableVersion(version) {
 		return "", errors.New("installation requires a stable semantic version")
@@ -139,12 +139,17 @@ func InstallArchive(ctx context.Context, root, archive, checksums, version strin
 		return "", err
 	}
 	legacyLauncher := filepath.Join(root, "spynel")
+	legacyOwned := false
 	if target, err := os.Readlink(legacyLauncher); err == nil {
 		if target != "current/spynel" {
 			return "", errors.New("refusing to replace an unrelated legacy launcher")
 		}
+		legacyOwned = true
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return "", errors.New("refusing to replace an unrelated legacy executable")
+	}
+	if legacyOwned && migrateLegacyStartup == nil {
+		return "", errors.New("legacy installation requires startup registration migration")
 	}
 	launcher := filepath.Join(root, "iris")
 	if target, err := os.Readlink(launcher); err == nil {
@@ -155,7 +160,9 @@ func InstallArchive(ctx context.Context, root, archive, checksums, version strin
 		return "", errors.New("refusing to replace an unrelated executable")
 	}
 	current := filepath.Join(root, "current")
+	currentTarget := ""
 	if target, err := os.Readlink(current); err == nil {
+		currentTarget = target
 		if filepath.Dir(target) != "releases" {
 			return "", errors.New("invalid current bundle link")
 		}
@@ -198,7 +205,10 @@ func InstallArchive(ctx context.Context, root, archive, checksums, version strin
 	if err := os.Rename(stage, destination); err != nil {
 		return "", err
 	}
-	if err := os.Symlink("current/iris", launcher); err != nil && !errors.Is(err, os.ErrExist) {
+	launcherCreated := false
+	if err := os.Symlink("current/iris", launcher); err == nil {
+		launcherCreated = true
+	} else if !errors.Is(err, os.ErrExist) {
 		return "", err
 	}
 	link := filepath.Join(root, ".current-"+filepath.Base(destination))
@@ -212,8 +222,34 @@ func InstallArchive(ctx context.Context, root, archive, checksums, version strin
 	if err := os.Rename(link, current); err != nil {
 		return "", err
 	}
-	if err := os.Remove(legacyLauncher); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return "", err
+	rollbackCurrent := func(cause error) error {
+		errorsFound := []error{cause}
+		if currentTarget == "" {
+			if err := os.Remove(current); err != nil && !errors.Is(err, os.ErrNotExist) {
+				errorsFound = append(errorsFound, err)
+			}
+		} else if err := os.Symlink(currentTarget, link); err != nil {
+			errorsFound = append(errorsFound, err)
+		} else if err := os.Rename(link, current); err != nil {
+			errorsFound = append(errorsFound, err)
+		}
+		if launcherCreated {
+			if err := os.Remove(launcher); err != nil && !errors.Is(err, os.ErrNotExist) {
+				errorsFound = append(errorsFound, err)
+			}
+		}
+		return errors.Join(errorsFound...)
+	}
+	if legacyOwned {
+		if err := migrateLegacyStartup(ctx, legacyLauncher, launcher); err != nil {
+			return "", rollbackCurrent(err)
+		}
+		if err := os.Remove(legacyLauncher); err != nil && !errors.Is(err, os.ErrNotExist) {
+			if reverseErr := migrateLegacyStartup(ctx, launcher, legacyLauncher); reverseErr != nil {
+				return "", errors.Join(err, reverseErr)
+			}
+			return "", rollbackCurrent(err)
+		}
 	}
 	return launcher, nil
 }

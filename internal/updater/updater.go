@@ -79,16 +79,17 @@ func (m *Manager) InitialAvailability() (available bool, checkedAt time.Time, ok
 
 // Manager owns source-specific release discovery and installation.
 type Manager struct {
-	CurrentVersion     string
-	InstallRoot        string
-	GitHubURL          string
-	PackageRoot        string
-	LauncherManaged    bool
-	CoordinatedUpdates bool
-	PeriodicChecks     bool
-	RegistryURL        string
-	CheckTimeout       time.Duration
-	Client             *http.Client
+	CurrentVersion       string
+	InstallRoot          string
+	GitHubURL            string
+	PackageRoot          string
+	LauncherManaged      bool
+	CoordinatedUpdates   bool
+	PeriodicChecks       bool
+	RegistryURL          string
+	CheckTimeout         time.Duration
+	Client               *http.Client
+	MigrateLegacyStartup func(context.Context, string, string) error
 }
 
 type packageMetadata struct {
