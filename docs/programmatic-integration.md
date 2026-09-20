@@ -21,12 +21,12 @@ WORK=/absolute/path/to/test-workspace
 example `info harness turn_started`, `info jobs job_finished`). This deliberately
 omits diagnostic bodies, prompts, provider payloads, source identities and
 credentials. Full bounded, redacted diagnostics remain available through
-`spynel log`. Consume or redirect stderr normally; a blocked stderr destination
+`iris log`. Consume or redirect stderr normally; a blocked stderr destination
 can apply backpressure. Protocol/JSON stdout is separate. `serve --tui` suppresses
 this mirror so it cannot corrupt that process's alternate screen.
 
-From another terminal in the same workspace/environment, run bare `spynel`
-(or `spynel serve --tui --config "$WORK/.spynel/config.yaml"`). It attaches to
+From another terminal in the same workspace/environment, run bare `iris`
+(or `iris serve --tui --config "$WORK/.spynel/config.yaml"`). It attaches to
 the same primary; only that primary runs channels and orchestration. An additional
 TUI has an independent conversation. It does **not** mirror `cli/adapter` or take
 over its response stream. `/resume` branches saved history into an independent

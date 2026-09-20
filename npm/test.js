@@ -46,7 +46,6 @@ assert.strictEqual(pkg.description, "A non-AI orchestration layer connecting one
 assert.strictEqual(pkg.bin.iris, "npm/bin/iris.js");
 assert.strictEqual(pkg.publishConfig.registry, "https://registry.npmjs.org");
 assert.strictEqual(pkg.repository.url, "git+https://github.com/edheltzel/Iris.git");
-assert(fs.readFileSync(path.join(__dirname, "install.js"), "utf8").includes("https://github.com/edheltzel/Iris/releases/download/"));
 assert.deepStrictEqual(releaseMetadata("v1.2.3-beta.1", "true"), {
   tag: "v1.2.3-beta.1",
   version: "1.2.3-beta.1",

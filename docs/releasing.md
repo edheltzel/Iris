@@ -17,16 +17,16 @@ The preferred steady-state credential is npm Trusted Publishing (OIDC), not a lo
 
 The package must exist before npm permits a trusted publisher to be configured. For the first publication:
 
-1. Create or use the npm account that will own the unscoped `spynel` package and enable 2FA.
+1. Create or use the npm account that will own the scoped `@edheltzel/iris` package and enable 2FA.
 2. Create a granular npm access token that can publish new public packages and bypasses interactive 2FA for automation.
 3. Save it as the GitHub Actions repository secret `NPM_TOKEN` and publish the first matching GitHub Release.
-4. In the new package's npm settings, add a GitHub Actions trusted publisher with organization/user `agent0ai`, repository `spynel`, workflow filename `release.yml`, and `npm publish` permission.
+4. In the new package's npm settings, add a GitHub Actions trusted publisher with organization/user `edheltzel`, repository `Iris`, workflow filename `release.yml`, and `npm publish` permission.
 5. Remove `NPM_TOKEN` after one successful OIDC publication. The workflow passes the secret only as a fallback for the bootstrap release; an empty value is valid once trusted publishing is active.
 
 The same setup can be created with a current npm CLI after the first package version exists:
 
 ```bash
-npm trust github spynel --repo agent0ai/spynel --file release.yml --allow-publish
+npm trust github @edheltzel/iris --repo edheltzel/Iris --file release.yml --allow-publish
 ```
 
 No GitHub personal access token is required for same-repository release assets: the job-scoped `GITHUB_TOKEN` receives `contents: write`. A separate fine-grained token is needed only if future workflow steps push metadata into another repository such as Homebrew or Scoop.
@@ -50,13 +50,13 @@ Before publishing, reproduce the local gates and build a runnable archive for th
 ./scripts/smoke.sh
 npm run test:npm
 npm pack --dry-run
-./scripts/package-native.sh 0.0.0 "$(go env GOOS)" "$(go env GOARCH)" /tmp/spynel-release
+./scripts/package-native.sh 0.0.0 "$(go env GOOS)" "$(go env GOARCH)" /tmp/iris-release
 ```
 
-Extract the host archive and execute `spynel --version` with its companion libraries still in the staged layout. The release workflow performs that execution before it creates every archive.
+Extract the host archive and execute `iris --version` with its companion libraries still in the staged layout. The release workflow performs that execution before it creates every archive.
 
 ## Standalone bootstrap
 
-The root `install.sh` uses the same native archives and `checksums.txt` as npm, preserving the complete runtime and license layout. The README uses the plain `curl -LsSf https://spynel.agent-zero.ai/install.sh | sh` command followed immediately by `spynel`. Keep shell configuration details out of that command. Public `uninstall.sh` shares the bootstrap and requires the `uninstall-bundles` helper introduced in 0.12.4. Publish that helper before updating the public scripts. Public URL routing is managed separately; checking in the script does not make that URL live. The first compatible release, 0.12.0, includes the native `install-bundle` entry point and GitHub updater. Older published bundles cannot acquire this behavior just by downloading the new shell script. Do not claim the one-liner works against an older release.
+The root `install.sh` uses the same native archives and `checksums.txt` as npm, preserving the complete runtime and license layout. The README uses the plain `curl -LsSf https://spynel.agent-zero.ai/install.sh | sh` command followed immediately by `iris`. Keep shell configuration details out of that command. Public `uninstall.sh` shares the bootstrap and requires the `uninstall-bundles` helper introduced in 0.12.4. Publish that helper before updating the public scripts. Public URL routing is managed separately; checking in the script does not make that URL live. The first compatible release, 0.12.0, includes the native `install-bundle` entry point and GitHub updater. Older published bundles cannot acquire this behavior just by downloading the new shell script. Do not claim the one-liner works against an older release.
 
 Before publishing that first release, build two isolated stable candidate versions with `scripts/package-native.sh`, put their checksums beside each archive, and run `python3 scripts/test-standalone.py <older-archive> <newer-archive>`. This starts only local release fixtures and a synthetic workspace with an unavailable harness, tests piped bootstrap and failed-download preservation, then exercises the real primary update/restart path. Native macOS verification requires running the same test with macOS candidates on a Mac; a Linux result does not establish that boundary.

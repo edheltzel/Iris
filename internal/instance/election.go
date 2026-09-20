@@ -109,7 +109,7 @@ func EnvironmentID() (string, error) {
 	if directory, err := os.UserConfigDir(); err == nil {
 		sources = []string{filepath.Join(directory, "iris"), filepath.Join(directory, "spynel")}
 	}
-	if err := migrateInto(root, sources...); err != nil {
+	if err := fsx.MigrateDir(root, sources...); err != nil {
 		return "", fmt.Errorf("migrate environment identity directory: %w", err)
 	}
 	path := filepath.Join(root, "environment-token")
@@ -152,44 +152,6 @@ func readEnvironmentToken(path string) (string, error) {
 		return "", errors.New("environment identity token is invalid")
 	}
 	return token, nil
-}
-
-func migrateInto(dest string, sources ...string) error {
-	if err := os.MkdirAll(filepath.Dir(dest), 0o700); err != nil {
-		return err
-	}
-	if _, err := os.Lstat(dest); err == nil {
-		return nil
-	} else if !os.IsNotExist(err) {
-		return err
-	}
-	for _, src := range sources {
-		info, err := os.Lstat(src)
-		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return err
-		}
-		if !info.IsDir() {
-			continue
-		}
-		err = os.Rename(src, dest)
-		if err == nil {
-			return nil
-		}
-		if _, destErr := os.Lstat(dest); destErr == nil {
-			return nil
-		}
-		if os.IsNotExist(err) {
-			if _, destErr := os.Lstat(dest); destErr == nil {
-				return nil
-			}
-			continue
-		}
-		return err
-	}
-	return nil
 }
 
 func validEnvironmentID(value string) bool {

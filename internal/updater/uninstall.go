@@ -17,6 +17,7 @@ import (
 // restart registrations. Workspace data is never an installation-owned path.
 func (m *Manager) Uninstall(ctx context.Context, removeStartup func() error) error {
 	root := m.InstallRoot
+	npmPrefix := ""
 	if root == "" {
 		root = m.PackageRoot
 	}
@@ -57,6 +58,7 @@ func (m *Manager) Uninstall(ctx context.Context, removeStartup func() error) err
 		if filepath.Base(modules) != "node_modules" || filepath.Base(filepath.Dir(modules)) != "lib" {
 			return errors.New("unsupported global npm installation layout")
 		}
+		npmPrefix = filepath.Dir(filepath.Dir(modules))
 	}
 	if m.InstallRoot != "" {
 		marker, err := os.Lstat(filepath.Join(root, ".spynel-install"))
@@ -80,8 +82,7 @@ func (m *Manager) Uninstall(ctx context.Context, removeStartup func() error) err
 	if m.InstallRoot == "" {
 		// npm owns its package and launcher links. Pin the prefix rather than
 		// allowing another npm configuration to select a different installation.
-		modules := filepath.Dir(root)
-		command := exec.CommandContext(ctx, "npm", "uninstall", "--global", "--prefix", filepath.Dir(filepath.Dir(modules)), "@edheltzel/iris")
+		command := exec.CommandContext(ctx, "npm", "uninstall", "--global", "--prefix", npmPrefix, "@edheltzel/iris")
 		var output limitedOutput
 		command.Stdout, command.Stderr = &output, &output
 		if err := command.Run(); err != nil {

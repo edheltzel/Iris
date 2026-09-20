@@ -57,7 +57,7 @@ if sys.argv[1:] == ["root", "--global"]:
 assert sys.argv[1] == "update", sys.argv
 with open(os.environ["INSTANCE_TEST_CALLS"], "a") as log:
     log.write("update\\n")
-old = package.with_name(".spynel-replaced")
+old = package.with_name(".iris-replaced")
 package.rename(old)
 shutil.copytree(os.environ["INSTANCE_TEST_REPLACEMENT"], package)
 shutil.rmtree(old)

@@ -16,7 +16,7 @@ import (
 
 const (
 	DefaultCheckTimeout = 10 * time.Second
-	defaultRegistryURL  = "https://registry.npmjs.org/spynel/latest"
+	defaultRegistryURL  = "https://registry.npmjs.org/@edheltzel/iris/latest"
 	maxRegistryResponse = 64 * 1024
 	periodicChecksEnv   = "SPYNEL_NPM_PERIODIC_UPDATE_CHECKS"
 	checkedAtEnv        = "SPYNEL_NPM_UPDATE_CHECKED_AT"

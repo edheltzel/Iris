@@ -12,6 +12,25 @@ import (
 	"time"
 )
 
+func TestMain(m *testing.M) {
+	root, err := os.MkdirTemp("", "iris-instance-test-")
+	if err != nil {
+		panic(err)
+	}
+	for name, value := range map[string]string{
+		"HOME":            filepath.Join(root, "home"),
+		"XDG_CONFIG_HOME": filepath.Join(root, "config"),
+		"XDG_CACHE_HOME":  filepath.Join(root, "cache"),
+	} {
+		if err := os.Setenv(name, value); err != nil {
+			panic(err)
+		}
+	}
+	code := m.Run()
+	_ = os.RemoveAll(root)
+	os.Exit(code)
+}
+
 func testEnvironmentID(character string) string { return strings.Repeat(character, 64) }
 
 func TestEnvironmentIDIsStablePrivateAndEnvironmentScoped(t *testing.T) {

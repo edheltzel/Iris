@@ -51,42 +51,11 @@ func adoptUserNamespace(parent string) (string, error) {
 		return "", err
 	}
 	dest := filepath.Join(home, ".agents", "Iris")
-	if err := os.MkdirAll(filepath.Dir(dest), 0o700); err != nil {
-		return "", err
-	}
-	if _, err := os.Lstat(dest); err == nil {
-		return dest, nil
-	} else if !os.IsNotExist(err) {
-		return "", err
-	}
 	var sources []string
 	if parent != "" {
 		sources = []string{filepath.Join(parent, "iris"), filepath.Join(parent, "spynel")}
 	}
-	for _, src := range sources {
-		info, err := os.Lstat(src)
-		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return "", err
-		}
-		if !info.IsDir() {
-			continue
-		}
-		err = os.Rename(src, dest)
-		if err == nil {
-			return dest, nil
-		}
-		if _, destErr := os.Lstat(dest); destErr == nil {
-			return dest, nil
-		}
-		if os.IsNotExist(err) {
-			if _, destErr := os.Lstat(dest); destErr == nil {
-				return dest, nil
-			}
-			continue
-		}
+	if err := fsx.MigrateDir(dest, sources...); err != nil {
 		return "", err
 	}
 	return dest, nil
@@ -233,8 +202,8 @@ func processRecords(ids []int) ([]ProcessRegistration, error) {
 		if err == nil && info.Path == own.Path {
 			executable := strings.TrimSuffix(path, " (deleted)")
 			root := npmRootFromExecutable(executable)
-			if strings.HasPrefix(filepath.Base(root), ".spynel-") {
-				root = filepath.Join(filepath.Dir(root), "@edheltzel", "iris")
+			if strings.HasPrefix(filepath.Base(root), ".iris-") {
+				root = filepath.Join(filepath.Dir(root), "iris")
 			}
 			if !validNPMRoot(root, "") {
 				root = ""
@@ -252,7 +221,7 @@ func (m *Manager) CheckRestartable() error {
 		return errors.New("updates require a managed Spynel installation")
 	}
 	if m.PackageRoot != "" && !m.CoordinatedUpdates {
-		return errors.New("this npm launcher does not support coordinated updates; run the installed spynel killall command once, then relaunch Spynel")
+		return errors.New("this npm launcher does not support coordinated updates; run the installed iris killall command once, then relaunch Spynel")
 	}
 	records, err := liveProcesses()
 	if err != nil {
@@ -260,7 +229,7 @@ func (m *Manager) CheckRestartable() error {
 	}
 	for _, record := range records {
 		if (record.Installation == root || m.ownsProcessPath(root, record.Executable)) && (record.Generation == "" || record.Installation != root || m.PackageRoot != "" && !record.CoordinatedUpdates) {
-			return fmt.Errorf("Spynel process %d has no valid coordinated-restart registration; run spynel killall once, then launch the current version", record.PID)
+			return fmt.Errorf("Spynel process %d has no valid coordinated-restart registration; run iris killall once, then launch the current version", record.PID)
 		}
 	}
 	return nil

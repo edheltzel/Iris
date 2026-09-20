@@ -21,7 +21,7 @@ func init() {
 		return
 	}
 	root := os.Getenv("SPYNEL_TEST_NPM_ROOT")
-	want := []string{"uninstall", "--global", "--prefix", filepath.Dir(filepath.Dir(filepath.Dir(root))), "@edheltzel/iris"}
+	want := []string{"uninstall", "--global", "--prefix", filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(root)))), "@edheltzel/iris"}
 	if strings.Join(os.Args[1:], "\x00") != strings.Join(want, "\x00") {
 		fmt.Fprintln(os.Stderr, "unexpected npm uninstall arguments")
 		os.Exit(1)

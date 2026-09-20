@@ -7,7 +7,7 @@ usage() {
   cat <<'EOF'
 Usage: scripts/install-dev.sh [--bin-dir DIRECTORY]
 
-Build Spynel for development and install it as spynel in a user bin directory.
+Build Spynel for development and install it as iris in a user bin directory.
 The default is $SPYNEL_DEV_BIN_DIR when set, otherwise $HOME/.local/bin.
 EOF
 }
@@ -67,7 +67,7 @@ if [ ! -x "$built_binary" ]; then
   echo "development build did not produce an executable: $built_binary" >&2
   exit 1
 fi
-staged=$(mktemp "$bin_dir/.spynel.dev.XXXXXX")
+staged=$(mktemp "$bin_dir/.iris.dev.XXXXXX")
 cleanup() {
   if [ -e "$staged" ]; then
     unlink "$staged"
