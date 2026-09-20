@@ -45,7 +45,7 @@ jobs:
           go test ./... github.com/charmbracelet/bubbletea
           go vet ./... github.com/charmbracelet/bubbletea
           mkdir -p .tmp-bin
-          go build -o .tmp-bin/spynel ./cmd/spynel
+          go build -o .tmp-bin/iris ./cmd/iris
           ./scripts/smoke.sh
           node npm/test.js
 
@@ -101,7 +101,7 @@ jobs:
           curl -LfS --retry 3 -o ".tmp-artifacts/standalone-prior/$archive" "https://github.com/agent0ai/spynel/releases/download/v0.12.1/$archive"
           curl -LfS --retry 3 -o .tmp-artifacts/standalone-prior/checksums.txt https://github.com/agent0ai/spynel/releases/download/v0.12.1/checksums.txt
           (cd .tmp-artifacts/standalone-prior && grep "  $archive$" checksums.txt | shasum -a 256 -c -)
-          python3 scripts/test-standalone.py ".tmp-artifacts/standalone-prior/$archive" "release/spynel_${RELEASE_TAG#v}_${TARGET_OS}_${TARGET_ARCH}.tar.gz"
+          python3 scripts/test-standalone.py ".tmp-artifacts/standalone-prior/$archive" "release/iris_${RELEASE_TAG#v}_${TARGET_OS}_${TARGET_ARCH}.tar.gz"
 
       - uses: actions/setup-node@v6
         with:
@@ -113,7 +113,7 @@ jobs:
           RELEASE_TAG: ${{ github.event.release.tag_name || inputs.version }}
           TARGET_OS: ${{ matrix.os }}
           TARGET_ARCH: ${{ matrix.arch }}
-        run: python3 scripts/test-instance-updates.py "release/spynel_${RELEASE_TAG#v}_${TARGET_OS}_${TARGET_ARCH}.tar.gz"
+        run: python3 scripts/test-instance-updates.py "release/iris_${RELEASE_TAG#v}_${TARGET_OS}_${TARGET_ARCH}.tar.gz"
 
       - name: Run native harness contract and packaged-archive smoke
         shell: bash

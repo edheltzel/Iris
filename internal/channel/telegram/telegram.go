@@ -20,11 +20,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/channel"
-	"github.com/agent0ai/spynel/internal/config"
-	"github.com/agent0ai/spynel/internal/core"
-	markdownfmt "github.com/agent0ai/spynel/internal/markdown"
-	"github.com/agent0ai/spynel/internal/media"
+	"github.com/edheltzel/iris/internal/channel"
+	"github.com/edheltzel/iris/internal/config"
+	"github.com/edheltzel/iris/internal/core"
+	markdownfmt "github.com/edheltzel/iris/internal/markdown"
+	"github.com/edheltzel/iris/internal/media"
 )
 
 type Bot struct {

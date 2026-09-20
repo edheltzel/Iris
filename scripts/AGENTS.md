@@ -8,7 +8,7 @@
 
 - Scripts resolve paths relative to themselves and must not depend on the caller's working directory.
 - Keep repository-local disposable script state only in purpose-specific ignored `.tmp*` directories: `.tmp-bin/` for development binaries, `.tmp-toolchains/` for the fallback Go distribution, `.tmp-tui-captures/` for default visual outputs, and `.tmp-artifacts/` for explicitly retained cross-review evidence. Every such directory must remain safe to remove wholesale.
-- `dev.sh build` writes the repository development executable only to ignored `.tmp-bin/spynel`; no generated root `bin/` directory or root `spynel` file is allowed.
+- `dev.sh build` writes the repository development executable only to ignored `.tmp-bin/iris`; no generated root `bin/` directory or root `iris` file is allowed.
 - `dev.sh test` includes the locally replaced Bubble Tea package explicitly alongside `./...` for both tests and vet, since Go excludes nested modules from that pattern.
 - `install-dev.sh` reuses that disposable build, atomically installs the executable into `$SPYNEL_DEV_BIN_DIR` or the conventional per-user `$HOME/.local/bin`, never edits shell profiles, and reports exact PATH setup or shadowing guidance so later terminals can resolve the development build safely.
 - Smoke tests use temporary projects and must not invoke live Codex, Claude Code, Pi, ACP agents, Telegram, or WhatsApp services; CLI-only smoke paths should avoid constructing a harness entirely.

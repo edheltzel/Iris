@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/agent0ai/spynel/internal/config"
+	"github.com/edheltzel/iris/internal/config"
 )
 
 func TestProactiveDeliveryReappliesTelegramAuthorization(t *testing.T) {

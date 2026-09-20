@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 )
@@ -24,14 +25,25 @@ func speechCacheDir(resolve func() (string, error)) (string, error) {
 		}
 		return "", fmt.Errorf("determine operating-system user cache directory for automatic speech assets: %w; configure speech.model_dir explicitly to avoid automatic model provisioning", err)
 	}
-	root := speechCachePath(base, runtime.GOOS)
+	root := speechCachePath(base, runtime.GOOS, "iris")
+	legacy := speechCachePath(base, runtime.GOOS, "spynel")
+	if _, err := os.Lstat(root); os.IsNotExist(err) {
+		if info, err := os.Lstat(legacy); err == nil && info.IsDir() {
+			if err := os.MkdirAll(filepath.Dir(root), 0o700); err != nil {
+				return "", fmt.Errorf("create speech cache parent %q: %w", filepath.Dir(root), err)
+			}
+			if err := os.Rename(legacy, root); err != nil {
+				return "", fmt.Errorf("migrate speech cache from %q to %q: %w", legacy, root, err)
+			}
+		}
+	}
 	if err := os.MkdirAll(root, 0o700); err != nil {
 		return "", fmt.Errorf("create shared speech cache %q: %w; check directory permissions or configure speech.model_dir explicitly", root, err)
 	}
 	return root, nil
 }
 
-func speechCachePath(base, goos string) string {
+func speechCachePath(base, goos, product string) string {
 	separator := "/"
 	if goos == "windows" {
 		separator = `\`
@@ -40,7 +52,7 @@ func speechCachePath(base, goos string) string {
 	if trimmed == "" && strings.HasPrefix(base, separator) {
 		trimmed = separator
 	}
-	suffix := strings.Join([]string{"spynel", "speech", speechCacheVersion, "parakeet"}, separator)
+	suffix := strings.Join([]string{product, "speech", speechCacheVersion, "parakeet"}, separator)
 	if trimmed == separator {
 		return trimmed + suffix
 	}

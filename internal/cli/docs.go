@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/agent0ai/spynel/internal/agentdocs"
+	"github.com/edheltzel/iris/internal/agentdocs"
 )
 
 type docsExitError struct{ code int }

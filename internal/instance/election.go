@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/fsx"
+	"github.com/edheltzel/iris/internal/fsx"
 )
 
 const (
@@ -105,7 +105,7 @@ func EnvironmentID() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("locate environment identity directory: %w", err)
 	}
-	path := filepath.Join(directory, "spynel", "environment-token")
+	path := filepath.Join(adoptUserNamespace(directory), "environment-token")
 	token, err := readEnvironmentToken(path)
 	if errors.Is(err, os.ErrNotExist) {
 		data := make([]byte, environmentTokenBytes)
@@ -145,6 +145,20 @@ func readEnvironmentToken(path string) (string, error) {
 		return "", errors.New("environment identity token is invalid")
 	}
 	return token, nil
+}
+
+func adoptUserNamespace(parent string) string {
+	next := filepath.Join(parent, "iris")
+	prev := filepath.Join(parent, "spynel")
+	if _, err := os.Lstat(next); err == nil {
+		return next
+	}
+	if info, err := os.Lstat(prev); err == nil && info.IsDir() {
+		if err := os.Rename(prev, next); err == nil {
+			return next
+		}
+	}
+	return next
 }
 
 func validEnvironmentID(value string) bool {

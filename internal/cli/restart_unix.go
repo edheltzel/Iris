@@ -6,7 +6,7 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/agent0ai/spynel/internal/updater"
+	"github.com/edheltzel/iris/internal/updater"
 )
 
 func replaceCurrentProcess(args []string) error {

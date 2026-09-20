@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/agent0ai/spynel/internal/channel"
-	"github.com/agent0ai/spynel/internal/channel/tui/textarea"
-	"github.com/agent0ai/spynel/internal/core"
+	"github.com/edheltzel/iris/internal/channel"
+	"github.com/edheltzel/iris/internal/channel/tui/textarea"
+	"github.com/edheltzel/iris/internal/core"
 	"github.com/charmbracelet/bubbles/viewport"
 )
 

@@ -10,7 +10,7 @@ const pkg = require("../package.json");
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const STARTUP_PROMPT_TIMEOUT_MS = 10_000;
-const DEFAULT_REGISTRY_URL = "https://registry.npmjs.org/spynel/latest";
+const DEFAULT_REGISTRY_URL = "https://registry.npmjs.org/@edheltzel/iris/latest";
 const MAX_RESPONSE_BYTES = 64 * 1024;
 
 function parseVersion(value) {

@@ -3,17 +3,17 @@ set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 project_dir=$(CDPATH= cd -- "$script_dir/.." && pwd)
-binary="$project_dir/.tmp-bin/spynel"
+binary="$project_dir/.tmp-bin/iris"
 
 "$script_dir/dev.sh" dox
 "$script_dir/dev.sh" build >/dev/null
-smoke_dir=$(mktemp -d "${TMPDIR:-/tmp}/spynel-smoke.XXXXXX")
+smoke_dir=$(mktemp -d "${TMPDIR:-/tmp}/iris-smoke.XXXXXX")
 trap 'rm -rf "$smoke_dir"' EXIT HUP INT TERM
 
 dev_bin_dir="$smoke_dir/user bin"
 SPYNEL_DEV_BIN_DIR="$dev_bin_dir" "$script_dir/install-dev.sh" >/dev/null
-test -x "$dev_bin_dir/spynel"
-"$dev_bin_dir/spynel" version >/dev/null
+test -x "$dev_bin_dir/iris"
+"$dev_bin_dir/iris" version >/dev/null
 
 docs_index=$(cd "$smoke_dir" && "$binary" docs)
 printf '%s\n' "$docs_index" | grep -q '`goals`'

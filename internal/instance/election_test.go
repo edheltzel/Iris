@@ -15,7 +15,9 @@ import (
 func testEnvironmentID(character string) string { return strings.Repeat(character, 64) }
 
 func TestEnvironmentIDIsStablePrivateAndEnvironmentScoped(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", home)
 	first, err := EnvironmentID()
 	if err != nil {
 		t.Fatal(err)
@@ -25,7 +27,7 @@ func TestEnvironmentIDIsStablePrivateAndEnvironmentScoped(t *testing.T) {
 		t.Fatalf("stable environment ID = %q, %q, %v", first, second, err)
 	}
 	configDirectory, _ := os.UserConfigDir()
-	tokenPath := filepath.Join(configDirectory, "spynel", "environment-token")
+	tokenPath := filepath.Join(configDirectory, "iris", "environment-token")
 	token, err := os.ReadFile(tokenPath)
 	if err != nil {
 		t.Fatal(err)
@@ -37,7 +39,9 @@ func TestEnvironmentIDIsStablePrivateAndEnvironmentScoped(t *testing.T) {
 	if err != nil || info.Mode().Perm() != 0o600 {
 		t.Fatalf("environment token permissions = %v, %v", info, err)
 	}
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	home2 := t.TempDir()
+	t.Setenv("HOME", home2)
+	t.Setenv("XDG_CONFIG_HOME", home2)
 	separate, err := EnvironmentID()
 	if err != nil || separate == first {
 		t.Fatalf("separate configuration environment ID = %q, first %q, %v", separate, first, err)

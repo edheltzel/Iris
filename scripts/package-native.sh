@@ -41,16 +41,16 @@ trap 'rm -rf "$work_dir"' EXIT HUP INT TERM
 stage_dir="$work_dir/spynel_${version}_${target_os}_${target_arch}"
 mkdir -p "$stage_dir" "$output_dir"
 
-binary=spynel
+binary=iris
 
 case "$target_os" in
   darwin)
     # Go's cgo linker safelist intentionally rejects @loader_path by default.
-    # Permit only Spynel's exact packaged-library rpath on native macOS builds.
-    (cd "$project_dir" && CGO_LDFLAGS_ALLOW='^-Wl,-rpath,@loader_path/lib$' CGO_ENABLED=1 GOOS="$target_os" GOARCH="$target_arch" "$go_bin" build -trimpath -ldflags="-s -w -X main.version=$version" -o "$stage_dir/$binary" ./cmd/spynel)
+    # Permit only Iris's exact packaged-library rpath on native macOS builds.
+    (cd "$project_dir" && CGO_LDFLAGS_ALLOW='^-Wl,-rpath,@loader_path/lib$' CGO_ENABLED=1 GOOS="$target_os" GOARCH="$target_arch" "$go_bin" build -trimpath -ldflags="-s -w -X main.version=$version" -o "$stage_dir/$binary" ./cmd/iris)
     ;;
   *)
-    (cd "$project_dir" && CGO_ENABLED=1 GOOS="$target_os" GOARCH="$target_arch" "$go_bin" build -trimpath -ldflags="-s -w -X main.version=$version" -o "$stage_dir/$binary" ./cmd/spynel)
+    (cd "$project_dir" && CGO_ENABLED=1 GOOS="$target_os" GOARCH="$target_arch" "$go_bin" build -trimpath -ldflags="-s -w -X main.version=$version" -o "$stage_dir/$binary" ./cmd/iris)
     ;;
 esac
 

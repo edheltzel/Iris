@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/config"
-	"github.com/agent0ai/spynel/internal/core"
+	"github.com/edheltzel/iris/internal/config"
+	"github.com/edheltzel/iris/internal/core"
 )
 
 // Managed describes one hot-reloadable transport without coupling the shared

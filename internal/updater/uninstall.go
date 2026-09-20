@@ -49,7 +49,11 @@ func (m *Manager) Uninstall(ctx context.Context, removeStartup func() error) err
 		m.InstallRoot = root
 	} else {
 		m.PackageRoot = root
-		modules := filepath.Dir(root)
+		pkg := root
+		if strings.HasPrefix(filepath.Base(filepath.Dir(pkg)), "@") {
+			pkg = filepath.Dir(pkg)
+		}
+		modules := filepath.Dir(pkg)
 		if filepath.Base(modules) != "node_modules" || filepath.Base(filepath.Dir(modules)) != "lib" {
 			return errors.New("unsupported global npm installation layout")
 		}
@@ -77,7 +81,7 @@ func (m *Manager) Uninstall(ctx context.Context, removeStartup func() error) err
 		// npm owns its package and launcher links. Pin the prefix rather than
 		// allowing another npm configuration to select a different installation.
 		modules := filepath.Dir(root)
-		command := exec.CommandContext(ctx, "npm", "uninstall", "--global", "--prefix", filepath.Dir(filepath.Dir(modules)), "spynel")
+		command := exec.CommandContext(ctx, "npm", "uninstall", "--global", "--prefix", filepath.Dir(filepath.Dir(modules)), "@edheltzel/iris")
 		var output limitedOutput
 		command.Stdout, command.Stderr = &output, &output
 		if err := command.Run(); err != nil {
@@ -93,7 +97,7 @@ func (m *Manager) Uninstall(ctx context.Context, removeStartup func() error) err
 		if !filepath.IsAbs(directory) {
 			continue
 		}
-		path := filepath.Join(directory, "spynel")
+		path := filepath.Join(directory, "iris")
 		if installationLink(path, root) {
 			if err := os.Remove(path); err != nil {
 				return err
@@ -112,7 +116,7 @@ func (m *Manager) Uninstall(ctx context.Context, removeStartup func() error) err
 			}
 		}
 	}
-	for _, name := range []string{"current", "spynel", "env", ".bin-dir", ".spynel-install", ".install.lock"} {
+	for _, name := range []string{"current", "iris", "env", ".bin-dir", ".spynel-install", ".install.lock"} {
 		if err := os.Remove(filepath.Join(root, name)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
@@ -133,7 +137,7 @@ func uninstallNPMRoot(root string) bool {
 	defer file.Close()
 	data, err := io.ReadAll(io.LimitReader(file, 65537))
 	var metadata packageMetadata
-	return err == nil && len(data) <= 65536 && json.Unmarshal(data, &metadata) == nil && metadata.Name == "spynel"
+	return err == nil && len(data) <= 65536 && json.Unmarshal(data, &metadata) == nil && metadata.Name == "@edheltzel/iris"
 }
 
 func installationLink(path, root string) bool {
@@ -146,7 +150,7 @@ func installationLink(path, root string) bool {
 	}
 	parent, err := filepath.EvalSymlinks(filepath.Dir(target))
 	resolvedRoot, rootErr := filepath.EvalSymlinks(root)
-	return err == nil && rootErr == nil && parent == resolvedRoot && filepath.Base(target) == "spynel"
+	return err == nil && rootErr == nil && parent == resolvedRoot && filepath.Base(target) == "iris"
 }
 
 func installationLauncherDirectories(root, home string) ([]string, error) {
@@ -183,7 +187,7 @@ func (m *Manager) NeedsAdministrator() bool {
 		return true
 	}
 	for _, directory := range paths {
-		if installationLink(filepath.Join(directory, "spynel"), root) && !installationWritable(directory) {
+		if installationLink(filepath.Join(directory, "iris"), root) && !installationWritable(directory) {
 			return true
 		}
 	}
@@ -196,7 +200,7 @@ func (m *Manager) ownsProcessPath(root, path string) bool {
 		return npmRootFromExecutable(path) == root
 	}
 	relative, err := filepath.Rel(filepath.Join(root, "releases"), path)
-	return err == nil && filepath.Base(relative) == "spynel" && len(strings.Split(relative, string(filepath.Separator))) == 2 && !strings.HasPrefix(relative, "..")
+	return err == nil && filepath.Base(relative) == "iris" && len(strings.Split(relative, string(filepath.Separator))) == 2 && !strings.HasPrefix(relative, "..")
 }
 
 func (m *Manager) stopProcesses(ctx context.Context, root string) error {

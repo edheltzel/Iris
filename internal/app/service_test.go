@@ -16,17 +16,17 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/agent0ai/spynel/internal/agentdocs"
-	"github.com/agent0ai/spynel/internal/channel"
-	"github.com/agent0ai/spynel/internal/channel/telegram"
-	"github.com/agent0ai/spynel/internal/config"
-	"github.com/agent0ai/spynel/internal/core"
-	"github.com/agent0ai/spynel/internal/harness"
-	"github.com/agent0ai/spynel/internal/history"
-	"github.com/agent0ai/spynel/internal/instructions"
-	"github.com/agent0ai/spynel/internal/orchestrator"
-	"github.com/agent0ai/spynel/internal/updater"
-	"github.com/agent0ai/spynel/internal/workspace"
+	"github.com/edheltzel/iris/internal/agentdocs"
+	"github.com/edheltzel/iris/internal/channel"
+	"github.com/edheltzel/iris/internal/channel/telegram"
+	"github.com/edheltzel/iris/internal/config"
+	"github.com/edheltzel/iris/internal/core"
+	"github.com/edheltzel/iris/internal/harness"
+	"github.com/edheltzel/iris/internal/history"
+	"github.com/edheltzel/iris/internal/instructions"
+	"github.com/edheltzel/iris/internal/orchestrator"
+	"github.com/edheltzel/iris/internal/updater"
+	"github.com/edheltzel/iris/internal/workspace"
 )
 
 func TestFormatStatusShowsScheduledGoalCheckpoint(t *testing.T) {

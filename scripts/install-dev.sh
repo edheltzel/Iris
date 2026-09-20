@@ -56,7 +56,7 @@ esac
 
 mkdir -p "$bin_dir"
 bin_dir=$(CDPATH= cd -- "$bin_dir" && pwd)
-target="$bin_dir/spynel"
+target="$bin_dir/iris"
 if [ -e "$target" ] && [ ! -f "$target" ] && [ ! -L "$target" ]; then
   echo "refusing to replace non-file target: $target" >&2
   exit 1
@@ -105,14 +105,14 @@ EOF
   exit 0
 fi
 
-resolved=$(command -v spynel || true)
+resolved=$(command -v iris || true)
 if [ "$resolved" != "$target" ]; then
   cat <<EOF
 
-Warning: PATH currently resolves spynel to ${resolved:-another location} before $target.
+Warning: PATH currently resolves iris to ${resolved:-another location} before $target.
 Move $bin_dir earlier in PATH to run this development build by name.
 EOF
   exit 0
 fi
 
-echo "Ready: run 'spynel' from this or any other terminal."
+echo "Ready: run 'iris' from this or any other terminal."

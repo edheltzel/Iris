@@ -21,13 +21,13 @@ func init() {
 		return
 	}
 	root := os.Getenv("SPYNEL_TEST_NPM_ROOT")
-	want := []string{"uninstall", "--global", "--prefix", filepath.Dir(filepath.Dir(filepath.Dir(root))), "spynel"}
+	want := []string{"uninstall", "--global", "--prefix", filepath.Dir(filepath.Dir(filepath.Dir(root))), "@edheltzel/iris"}
 	if strings.Join(os.Args[1:], "\x00") != strings.Join(want, "\x00") {
 		fmt.Fprintln(os.Stderr, "unexpected npm uninstall arguments")
 		os.Exit(1)
 	}
 	if pid, _ := strconv.Atoi(os.Getenv("SPYNEL_TEST_NPM_PID")); pid > 0 {
-		if path, err := installationProcessPath(pid); err == nil && path == filepath.Join(root, "npm", "vendor", "spynel") {
+		if path, err := installationProcessPath(pid); err == nil && path == filepath.Join(root, "npm", "vendor", "iris") {
 			os.Exit(2)
 		}
 	}
@@ -97,9 +97,9 @@ func TestUninstallStopsOnlyOwnedProcessesAndPreservesWorkspace(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, ".spynel-install"), []byte(ownershipMarker), 0600); err != nil {
 		t.Fatal(err)
 	}
-	first := uninstallFixtureProcess(t, filepath.Join(root, "releases", "first", "spynel"), "term")
-	second := uninstallFixtureProcess(t, filepath.Join(root, "releases", "second", "spynel"), "ignore-term")
-	unrelated := uninstallFixtureProcess(t, filepath.Join(t.TempDir(), "spynel"), "term")
+	first := uninstallFixtureProcess(t, filepath.Join(root, "releases", "first", "iris"), "term")
+	second := uninstallFixtureProcess(t, filepath.Join(root, "releases", "second", "iris"), "ignore-term")
+	unrelated := uninstallFixtureProcess(t, filepath.Join(t.TempDir(), "iris"), "term")
 	workspace := filepath.Join(root, ".spynel")
 	if err := os.Mkdir(workspace, 0700); err != nil {
 		t.Fatal(err)
@@ -111,8 +111,8 @@ func TestUninstallStopsOnlyOwnedProcessesAndPreservesWorkspace(t *testing.T) {
 	if err := os.MkdirAll(bin, 0700); err != nil {
 		t.Fatal(err)
 	}
-	launcher := filepath.Join(bin, "spynel")
-	if err := os.Symlink(filepath.Join(root, "spynel"), launcher); err != nil {
+	launcher := filepath.Join(bin, "iris")
+	if err := os.Symlink(filepath.Join(root, "iris"), launcher); err != nil {
 		t.Fatal(err)
 	}
 	manager := &Manager{InstallRoot: root}
@@ -183,10 +183,10 @@ func TestUninstallNPMStopsBinaryBeforePackageRemoval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	root := filepath.Join(prefix, "lib", "node_modules", "spynel")
-	process := uninstallFixtureProcess(t, filepath.Join(root, "npm", "vendor", "spynel"), "term")
+	root := filepath.Join(prefix, "lib", "node_modules", "@edheltzel/iris")
+	process := uninstallFixtureProcess(t, filepath.Join(root, "npm", "vendor", "iris"), "term")
 	for name, value := range map[string]any{
-		"package.json": map[string]string{"name": "spynel", "version": "0.12.2"},
+		"package.json": map[string]string{"name": "@edheltzel/iris", "version": "0.12.2"},
 	} {
 		data, _ := json.Marshal(value)
 		if err := os.WriteFile(filepath.Join(root, name), data, 0600); err != nil {

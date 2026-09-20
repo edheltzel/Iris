@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/fsx"
-	"github.com/agent0ai/spynel/internal/shortid"
+	"github.com/edheltzel/iris/internal/fsx"
+	"github.com/edheltzel/iris/internal/shortid"
 )
 
 const (

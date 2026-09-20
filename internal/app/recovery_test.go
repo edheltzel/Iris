@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/channel"
-	"github.com/agent0ai/spynel/internal/config"
-	"github.com/agent0ai/spynel/internal/core"
-	"github.com/agent0ai/spynel/internal/harness"
-	"github.com/agent0ai/spynel/internal/history"
-	"github.com/agent0ai/spynel/internal/orchestrator"
-	"github.com/agent0ai/spynel/internal/workspace"
+	"github.com/edheltzel/iris/internal/channel"
+	"github.com/edheltzel/iris/internal/config"
+	"github.com/edheltzel/iris/internal/core"
+	"github.com/edheltzel/iris/internal/harness"
+	"github.com/edheltzel/iris/internal/history"
+	"github.com/edheltzel/iris/internal/orchestrator"
+	"github.com/edheltzel/iris/internal/workspace"
 )
 
 func newRecoveryTestService(t *testing.T) (*Service, *serviceHarness, config.Config) {

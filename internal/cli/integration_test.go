@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/app"
-	"github.com/agent0ai/spynel/internal/config"
-	"github.com/agent0ai/spynel/internal/core"
-	"github.com/agent0ai/spynel/internal/instance"
-	"github.com/agent0ai/spynel/internal/localapi"
-	"github.com/agent0ai/spynel/internal/workspace"
+	"github.com/edheltzel/iris/internal/app"
+	"github.com/edheltzel/iris/internal/config"
+	"github.com/edheltzel/iris/internal/core"
+	"github.com/edheltzel/iris/internal/instance"
+	"github.com/edheltzel/iris/internal/localapi"
+	"github.com/edheltzel/iris/internal/workspace"
 )
 
 type terminalCLIHarness struct{ *heldCLIHarness }

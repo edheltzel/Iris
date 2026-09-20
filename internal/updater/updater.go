@@ -138,7 +138,7 @@ func Detect(currentVersion string) *Manager {
 	if root == "" {
 		root = launcherRoot
 	}
-	if validNPMRoot(root, currentVersion) && sameFile(executable, filepath.Join(root, "npm", "vendor", "spynel")) {
+	if validNPMRoot(root, currentVersion) && sameFile(executable, filepath.Join(root, "npm", "vendor", "iris")) {
 		manager.PackageRoot = root
 		manager.LauncherManaged = os.Getenv("SPYNEL_NPM_LAUNCHER_MANAGED") == "1" && sameFile(root, launcherRoot)
 		manager.CoordinatedUpdates = manager.LauncherManaged && os.Getenv("SPYNEL_NPM_COORDINATED_UPDATES") == "1"
@@ -173,7 +173,7 @@ func validNPMRoot(root, currentVersion string) bool {
 		return false
 	}
 	var metadata packageMetadata
-	if json.Unmarshal(data, &metadata) != nil || metadata.Name != "spynel" {
+	if json.Unmarshal(data, &metadata) != nil || metadata.Name != "@edheltzel/iris" {
 		return false
 	}
 	markerData, err := os.ReadFile(filepath.Join(root, "npm", "vendor", ".installed.json"))
@@ -193,7 +193,7 @@ func (m *Manager) Check(ctx context.Context) (Result, error) {
 		InstalledViaNPM: m != nil && m.PackageRoot != "",
 		Current:         "",
 		CanAutoInstall:  m != nil && m.PackageRoot != "" && m.LauncherManaged,
-		Command:         "npm update --global spynel",
+		Command:         "npm update --global @edheltzel/iris",
 	}
 	if m == nil {
 		return result, nil

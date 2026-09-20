@@ -15,7 +15,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/agent0ai/spynel/internal/channel/tui/textarea"
+	"github.com/edheltzel/iris/internal/channel/tui/textarea"
 	bubblespinner "github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -24,11 +24,11 @@ import (
 	"github.com/muesli/termenv"
 	"github.com/rivo/uniseg"
 
-	"github.com/agent0ai/spynel/internal/channel"
-	"github.com/agent0ai/spynel/internal/core"
-	"github.com/agent0ai/spynel/internal/history"
-	markdownfmt "github.com/agent0ai/spynel/internal/markdown"
-	"github.com/agent0ai/spynel/internal/theme"
+	"github.com/edheltzel/iris/internal/channel"
+	"github.com/edheltzel/iris/internal/core"
+	"github.com/edheltzel/iris/internal/history"
+	markdownfmt "github.com/edheltzel/iris/internal/markdown"
+	"github.com/edheltzel/iris/internal/theme"
 )
 
 type uiEvent struct {

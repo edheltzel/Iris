@@ -16,7 +16,7 @@ func TestDeveloperVerificationPaths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, required := range []string{"shared user cache", "scripts/cold-cache.sh", ".tmp-bin/spynel", ".tmp-artifacts/<task-id>/"} {
+	for _, required := range []string{"shared user cache", "scripts/cold-cache.sh", ".tmp-bin/iris", ".tmp-artifacts/<task-id>/"} {
 		if !strings.Contains(string(rootDOX), required) {
 			t.Errorf("canonical repository AGENTS.md is missing %q", required)
 		}
@@ -25,7 +25,7 @@ func TestDeveloperVerificationPaths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, required := range []string{"cold-cache.sh", "dedicated process group", "complete owned process tree", ".tmp-bin/spynel"} {
+	for _, required := range []string{"cold-cache.sh", "dedicated process group", "complete owned process tree", ".tmp-bin/iris"} {
 		if !strings.Contains(string(scriptDOX), required) {
 			t.Errorf("repository-only cold-cache contract is missing %q", required)
 		}

@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/config"
-	"github.com/agent0ai/spynel/internal/extensions"
-	"github.com/agent0ai/spynel/internal/workspace"
+	"github.com/edheltzel/iris/internal/config"
+	"github.com/edheltzel/iris/internal/extensions"
+	"github.com/edheltzel/iris/internal/workspace"
 )
 
 func TestTaskPolicyDefaultsAndFailsSafe(t *testing.T) {

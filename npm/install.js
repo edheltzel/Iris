@@ -122,9 +122,9 @@ function validateExtractedTree(root) {
 
 async function install() {
   const target = current();
-  const archive = `spynel_${version}_${target.os}_${target.arch}.${target.ext}`;
-  const base = process.env.SPYNEL_DOWNLOAD_BASE || `https://github.com/agent0ai/spynel/releases/download/v${version}`;
-  const destination = path.join(vendor, "spynel");
+  const archive = `iris_${version}_${target.os}_${target.arch}.${target.ext}`;
+  const base = process.env.SPYNEL_DOWNLOAD_BASE || `https://github.com/edheltzel/Iris/releases/download/v${version}`;
+  const destination = path.join(vendor, "iris");
   if (fs.existsSync(destination) && fs.existsSync(marker)) {
     try {
       const installed = JSON.parse(fs.readFileSync(marker, "utf8"));
@@ -148,7 +148,7 @@ async function install() {
     childProcess.execFileSync("tar", ["-xzf", temp, "-C", staging, "--no-same-owner", "--no-same-permissions"]);
     fs.rmSync(temp);
     validateExtractedTree(staging);
-    const stagedBinary = path.join(staging, "spynel");
+    const stagedBinary = path.join(staging, "iris");
     if (!fs.lstatSync(stagedBinary).isFile()) throw new Error(`release archive does not contain ${path.basename(stagedBinary)}`);
     fs.chmodSync(stagedBinary, 0o755);
     fs.writeFileSync(path.join(staging, ".installed.json"), JSON.stringify({ version, os: target.os, arch: target.arch }) + "\n", { mode: 0o600 });

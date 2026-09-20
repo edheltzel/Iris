@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/agent0ai/spynel/internal/fsx"
+	"github.com/edheltzel/iris/internal/fsx"
 )
 
 func stateRoot(t *testing.T) string {

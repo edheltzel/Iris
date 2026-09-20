@@ -23,7 +23,7 @@ import (
 func candidateArchive(t *testing.T, version string, mutate func(map[string]string), extra *tar.Header) (string, string) {
 	t.Helper()
 	files := map[string]string{
-		"spynel":  "#!/bin/sh\nprintf 'spynel " + version + "\\n'\n",
+		"iris":    "#!/bin/sh\nprintf 'iris " + version + "\\n'\n",
 		"LICENSE": "license", "THIRD_PARTY_NOTICES.md": "notices",
 	}
 	for _, name := range []string{"sherpa-onnx", "onnxruntime", "miniaudio", "pion-opus", "bubbletea", "bubbles-textarea"} {
@@ -120,12 +120,12 @@ func TestInstallRetainsWorkingBundleAndRejectsInvalidCandidates(t *testing.T) {
 				}
 			}
 		}},
-		{name: "wrong version", mutate: func(files map[string]string) { files["spynel"] = "#!/bin/sh\necho spynel 7.0.0\n" }},
+		{name: "wrong version", mutate: func(files map[string]string) { files["iris"] = "#!/bin/sh\necho iris 7.0.0\n" }},
 		{name: "traversal", header: &tar.Header{Name: "../escape", Typeflag: tar.TypeReg}},
 		{name: "absolute", header: &tar.Header{Name: "/escape", Typeflag: tar.TypeReg}},
 		{name: "symlink", header: &tar.Header{Name: "link", Typeflag: tar.TypeSymlink, Linkname: "/tmp"}},
-		{name: "hardlink", header: &tar.Header{Name: "link", Typeflag: tar.TypeLink, Linkname: "./spynel"}},
-		{name: "duplicate", header: &tar.Header{Name: "./spynel", Typeflag: tar.TypeReg}},
+		{name: "hardlink", header: &tar.Header{Name: "link", Typeflag: tar.TypeLink, Linkname: "./iris"}},
+		{name: "duplicate", header: &tar.Header{Name: "./iris", Typeflag: tar.TypeReg}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -264,7 +264,7 @@ func TestNPMEnvironmentCannotClaimUnrelatedExecutable(t *testing.T) {
 	}
 	_ = os.WriteFile(filepath.Join(root, "package.json"), []byte(`{"name":"spynel","version":"1.2.0"}`), 0600)
 	_ = os.WriteFile(filepath.Join(root, "npm", "vendor", ".installed.json"), []byte(`{"version":"1.2.0"}`), 0600)
-	_ = os.WriteFile(filepath.Join(root, "npm", "vendor", "spynel"), []byte("unrelated"), 0700)
+	_ = os.WriteFile(filepath.Join(root, "npm", "vendor", "iris"), []byte("unrelated"), 0700)
 	t.Setenv("SPYNEL_NPM_PACKAGE_ROOT", root)
 	t.Setenv("SPYNEL_NPM_LAUNCHER_MANAGED", "1")
 	if got := Detect("1.2.0"); got.PackageRoot != "" {

@@ -16,13 +16,14 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/config"
+	"github.com/edheltzel/iris/internal/config"
 )
 
 func TestModelKindUsesEnglishOnlyForEnglish(t *testing.T) {
@@ -42,7 +43,7 @@ func TestSpeechCacheDirUsesStablePerUserNamespace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := filepath.Join(base, "spynel", "speech", speechCacheVersion, "parakeet")
+	want := filepath.Join(base, "iris", "speech", speechCacheVersion, "parakeet")
 	if got != want {
 		t.Fatalf("speech cache = %q, want %q", got, want)
 	}
@@ -51,17 +52,44 @@ func TestSpeechCacheDirUsesStablePerUserNamespace(t *testing.T) {
 	}
 }
 
+func TestSpeechCacheDirMigratesLegacyContents(t *testing.T) {
+	base := t.TempDir()
+	legacy := speechCachePath(base, runtime.GOOS, "spynel")
+	if err := os.MkdirAll(legacy, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(legacy, "model.bin")
+	if err := os.WriteFile(marker, []byte("keep-me"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := speechCacheDir(func() (string, error) { return base, nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := speechCachePath(base, runtime.GOOS, "iris")
+	if got != want {
+		t.Fatalf("speech cache = %q, want %q", got, want)
+	}
+	data, err := os.ReadFile(filepath.Join(got, "model.bin"))
+	if err != nil || string(data) != "keep-me" {
+		t.Fatalf("migrated model = %q err=%v", data, err)
+	}
+	if _, err := os.Stat(legacy); !os.IsNotExist(err) {
+		t.Fatalf("legacy cache still present: %v", err)
+	}
+}
+
 func TestSpeechCachePathUsesPlatformVariants(t *testing.T) {
 	tests := []struct {
 		name, goos, base, want string
 	}{
-		{name: "linux", goos: "linux", base: "/home/spy/.cache", want: "/home/spy/.cache/spynel/speech/v1/parakeet"},
-		{name: "darwin", goos: "darwin", base: "/Users/spy/Library/Caches", want: "/Users/spy/Library/Caches/spynel/speech/v1/parakeet"},
-		{name: "windows", goos: "windows", base: `C:\Users\spy\AppData\Local`, want: `C:\Users\spy\AppData\Local\spynel\speech\v1\parakeet`},
+		{name: "linux", goos: "linux", base: "/home/spy/.cache", want: "/home/spy/.cache/iris/speech/v1/parakeet"},
+		{name: "darwin", goos: "darwin", base: "/Users/spy/Library/Caches", want: "/Users/spy/Library/Caches/iris/speech/v1/parakeet"},
+		{name: "windows", goos: "windows", base: `C:\Users\spy\AppData\Local`, want: `C:\Users\spy\AppData\Local\iris\speech\v1\parakeet`},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := speechCachePath(test.base, test.goos); got != test.want {
+			if got := speechCachePath(test.base, test.goos, "iris"); got != test.want {
 				t.Fatalf("speech cache path = %q, want %q", got, test.want)
 			}
 		})

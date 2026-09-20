@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/channel"
-	"github.com/agent0ai/spynel/internal/core"
-	"github.com/agent0ai/spynel/internal/history"
-	"github.com/agent0ai/spynel/internal/orchestrator"
-	"github.com/agent0ai/spynel/internal/shortid"
+	"github.com/edheltzel/iris/internal/channel"
+	"github.com/edheltzel/iris/internal/core"
+	"github.com/edheltzel/iris/internal/history"
+	"github.com/edheltzel/iris/internal/orchestrator"
+	"github.com/edheltzel/iris/internal/shortid"
 )
 
 const (

@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/agent0ai/spynel/internal/config"
-	"github.com/agent0ai/spynel/internal/media/miniaudio"
+	"github.com/edheltzel/iris/internal/config"
+	"github.com/edheltzel/iris/internal/media/miniaudio"
 	sherpa "github.com/k2-fsa/sherpa-onnx-go/sherpa_onnx"
 )
 

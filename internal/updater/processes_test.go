@@ -51,7 +51,7 @@ func TestLifecycleProcessFixture(t *testing.T) {
 
 func lifecycleFixture(t *testing.T, installation string) *exec.Cmd {
 	t.Helper()
-	binary := filepath.Join(installation, "releases", filepath.Base(t.TempDir()), "spynel")
+	binary := filepath.Join(installation, "releases", filepath.Base(t.TempDir()), "iris")
 	uninstallFixtureBinary(t, binary)
 	command := exec.Command(binary, "-test.run=^TestLifecycleProcessFixture$")
 	command.Dir = t.TempDir()

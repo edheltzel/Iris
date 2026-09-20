@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/fsx"
+	"github.com/edheltzel/iris/internal/fsx"
 )
 
 const (

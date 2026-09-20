@@ -2,7 +2,7 @@
 
 ## Purpose
 
-- Own the installed `spynel` Node executable shim.
+- Own the installed `iris` Node executable shim.
 
 ## Local Contracts
 

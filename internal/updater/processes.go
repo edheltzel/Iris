@@ -17,7 +17,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/fsx"
+	"github.com/edheltzel/iris/internal/fsx"
 )
 
 // ProcessRegistration identifies a live server/TUI, including secondary TUIs
@@ -37,11 +37,25 @@ func processDirectory() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	directory = filepath.Join(directory, "spynel", "processes")
+	directory = filepath.Join(adoptUserNamespace(directory), "processes")
 	if err := privateDirectory(directory); err != nil {
 		return "", err
 	}
 	return directory, nil
+}
+
+func adoptUserNamespace(parent string) string {
+	next := filepath.Join(parent, "iris")
+	prev := filepath.Join(parent, "spynel")
+	if _, err := os.Lstat(next); err == nil {
+		return next
+	}
+	if info, err := os.Lstat(prev); err == nil && info.IsDir() {
+		if err := os.Rename(prev, next); err == nil {
+			return next
+		}
+	}
+	return next
 }
 
 func (m *Manager) InstallationRoot() string {
@@ -178,7 +192,7 @@ func processRecords(ids []int) ([]ProcessRegistration, error) {
 				continue
 			}
 		}
-		if filepath.Base(strings.TrimSuffix(path, " (deleted)")) != "spynel" {
+		if filepath.Base(strings.TrimSuffix(path, " (deleted)")) != "iris" {
 			continue
 		}
 		info, err := buildinfo.ReadFile(processImagePath(pid, path))
@@ -186,7 +200,7 @@ func processRecords(ids []int) ([]ProcessRegistration, error) {
 			executable := strings.TrimSuffix(path, " (deleted)")
 			root := npmRootFromExecutable(executable)
 			if strings.HasPrefix(filepath.Base(root), ".spynel-") {
-				root = filepath.Join(filepath.Dir(root), "spynel")
+				root = filepath.Join(filepath.Dir(root), "@edheltzel", "iris")
 			}
 			if !validNPMRoot(root, "") {
 				root = ""

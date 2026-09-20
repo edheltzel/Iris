@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/config"
-	"github.com/agent0ai/spynel/internal/instructions"
+	"github.com/edheltzel/iris/internal/config"
+	"github.com/edheltzel/iris/internal/instructions"
 )
 
 const (

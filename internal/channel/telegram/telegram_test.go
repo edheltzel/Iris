@@ -17,10 +17,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/channel"
-	"github.com/agent0ai/spynel/internal/config"
-	"github.com/agent0ai/spynel/internal/core"
-	"github.com/agent0ai/spynel/internal/media"
+	"github.com/edheltzel/iris/internal/channel"
+	"github.com/edheltzel/iris/internal/config"
+	"github.com/edheltzel/iris/internal/core"
+	"github.com/edheltzel/iris/internal/media"
 )
 
 type fixedTranscriber struct{ text string }
