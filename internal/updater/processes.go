@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/edheltzel/iris/internal/fsx"
+	"github.com/edheltzel/iris/internal/instance"
 )
 
 const legacyProcessModule = "github.com/agent0ai/spynel"
@@ -35,32 +36,18 @@ type ProcessRegistration struct {
 }
 
 func processDirectory() (string, error) {
-	parent, _ := os.UserConfigDir()
-	directory, err := adoptUserNamespace(parent)
-	if err != nil {
-		return "", err
+	if _, err := instance.EnvironmentID(); err != nil {
+		return "", fmt.Errorf("prepare process identity directory: %w", err)
 	}
-	directory = filepath.Join(directory, "processes")
-	if err := privateDirectory(directory); err != nil {
-		return "", err
-	}
-	return directory, nil
-}
-
-func adoptUserNamespace(parent string) (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	dest := filepath.Join(home, ".agents", "Iris")
-	var sources []string
-	if parent != "" {
-		sources = []string{filepath.Join(parent, "iris"), filepath.Join(parent, "spynel")}
-	}
-	if err := fsx.MigrateDir(dest, sources...); err != nil {
+	directory := filepath.Join(home, ".agents", "Iris", "processes")
+	if err := privateDirectory(directory); err != nil {
 		return "", err
 	}
-	return dest, nil
+	return directory, nil
 }
 
 func (m *Manager) InstallationRoot() string {

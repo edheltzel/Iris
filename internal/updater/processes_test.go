@@ -74,6 +74,59 @@ func lifecycleFixture(t *testing.T, installation string) *exec.Cmd {
 	return command
 }
 
+func TestProcessDirectoryUsesIdentityMigrationBoundary(t *testing.T) {
+	t.Run("rejects dual tokens", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+		config, err := os.UserConfigDir()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range []string{"iris", "spynel"} {
+			directory := filepath.Join(config, name)
+			if err := os.MkdirAll(directory, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(directory, "environment-token"), []byte(name), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := processDirectory(); err == nil || !strings.Contains(err.Error(), "both legacy environment identity sources contain tokens") {
+			t.Fatalf("dual-token process directory error = %v", err)
+		}
+		if _, err := os.Stat(filepath.Join(home, ".agents", "Iris", "processes")); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("process directory unexpectedly created: %v", err)
+		}
+	})
+
+	t.Run("migrates spynel first", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+		config, err := os.UserConfigDir()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for name, content := range map[string]string{"iris": "iris", "spynel": "spynel"} {
+			directory := filepath.Join(config, name)
+			if err := os.MkdirAll(directory, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(directory, "shared"), []byte(content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := processDirectory(); err == nil || !strings.Contains(err.Error(), "migration entry conflicts") {
+			t.Fatalf("tokenless migration error = %v", err)
+		}
+		data, err := os.ReadFile(filepath.Join(home, ".agents", "Iris", "shared"))
+		if err != nil || string(data) != "spynel" {
+			t.Fatalf("tokenless migration winner = %q, %v", data, err)
+		}
+	})
+}
+
 func TestRestartAllWorkspacesAndStopAllInstallations(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	// macOS uses HOME for UserConfigDir.
