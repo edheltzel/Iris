@@ -11,6 +11,82 @@ import (
 	"time"
 )
 
+func TestInstallDevRemovesOnlyOwnedLegacySymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX development installer")
+	}
+	directory := t.TempDir()
+	installer := filepath.Join(directory, "install-dev.sh")
+	source, err := filepath.Abs("install-dev.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(source, installer); err != nil {
+		t.Fatal(err)
+	}
+	built := filepath.Join(directory, "built-iris")
+	if err := os.WriteFile(built, []byte("#!/bin/sh\nexit 0\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, "dev.sh"), []byte("#!/bin/sh\nprintf '%s\\n' \"$DEV_BUILD\"\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, test := range []struct {
+		name        string
+		setup       func(string) error
+		wantRemoved bool
+		wantWarning bool
+	}{
+		{
+			name: "owned symlink",
+			setup: func(path string) error {
+				return os.Symlink(built, path)
+			},
+			wantRemoved: true,
+		},
+		{
+			name: "unowned file",
+			setup: func(path string) error {
+				return os.WriteFile(path, []byte("unrelated\n"), 0o700)
+			},
+			wantWarning: true,
+		},
+		{
+			name: "unowned symlink",
+			setup: func(path string) error {
+				other := filepath.Join(filepath.Dir(path), "other")
+				if err := os.WriteFile(other, []byte("unrelated\n"), 0o700); err != nil {
+					return err
+				}
+				return os.Symlink(other, path)
+			},
+			wantWarning: true,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			bin := t.TempDir()
+			legacy := filepath.Join(bin, "spynel")
+			if err := test.setup(legacy); err != nil {
+				t.Fatal(err)
+			}
+			command := exec.Command("sh", installer, "--bin-dir", bin)
+			command.Env = append(os.Environ(), "DEV_BUILD="+built)
+			output, err := command.CombinedOutput()
+			if err != nil {
+				t.Fatalf("install-dev failed: %v output=%q", err, output)
+			}
+			_, statErr := os.Lstat(legacy)
+			if test.wantRemoved != os.IsNotExist(statErr) {
+				t.Fatalf("legacy target removal = %t, want %t: %v", os.IsNotExist(statErr), test.wantRemoved, statErr)
+			}
+			if strings.Contains(string(output), "leaving unowned legacy command") != test.wantWarning {
+				t.Fatalf("warning output = %q, want warning %t", output, test.wantWarning)
+			}
+		})
+	}
+}
+
 func TestColdCacheHelperCleansCancelledRunOutsideWorkspace(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("Linux procfs cancellation contract")

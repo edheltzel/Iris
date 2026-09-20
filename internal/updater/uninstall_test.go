@@ -238,3 +238,65 @@ func TestUninstallNPMStopsBinaryBeforePackageRemoval(t *testing.T) {
 		t.Fatal("npm process remains: " + strconv.Itoa(process.Process.Pid))
 	}
 }
+
+func TestStopLegacyNPMRemovesRuntimeWithoutPackage(t *testing.T) {
+	prefix, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(prefix, "lib", "node_modules", "spynel")
+	legacy := uninstallFixtureProcess(t, filepath.Join(root, "npm", "vendor", "spynel"), "term")
+	unrelated := uninstallFixtureProcess(t, filepath.Join(t.TempDir(), "npm", "vendor", "spynel"), "term")
+	metadata, _ := json.Marshal(map[string]any{
+		"name":       "spynel",
+		"version":    "0.12.2",
+		"repository": map[string]string{"url": "git+https://github.com/agent0ai/spynel.git"},
+		"bin":        map[string]string{"spynel": "npm/bin/spynel.js"},
+	})
+	marker, _ := json.Marshal(map[string]string{"version": "0.12.2"})
+	if err := os.WriteFile(filepath.Join(root, "package.json"), metadata, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "npm", "vendor", ".installed.json"), marker, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manager := &Manager{PackageRoot: root}
+	removedStartup := false
+	if err := manager.StopLegacyNPM(t.Context(), func(cleanRoot string) error {
+		if cleanRoot != root {
+			t.Fatalf("cleanup root = %q, want %q", cleanRoot, root)
+		}
+		removedStartup = true
+		if err := legacy.Process.Signal(syscall.Signal(0)); err != nil {
+			t.Fatal("legacy process stopped before its startup registration")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !removedStartup {
+		t.Fatal("startup cleanup was skipped")
+	}
+	if path, err := installationProcessPath(legacy.Process.Pid); err == nil && manager.ownsProcessPath(root, path) {
+		t.Fatal("legacy npm process remains")
+	}
+	if err := unrelated.Process.Signal(syscall.Signal(0)); err != nil {
+		t.Fatal("unrelated process was stopped")
+	}
+	if _, err := os.Stat(filepath.Join(root, "package.json")); err != nil {
+		t.Fatal("legacy npm package was removed")
+	}
+	metadata, _ = json.Marshal(map[string]any{
+		"name":       "spynel",
+		"version":    "0.12.2",
+		"repository": map[string]string{"url": "https://example.com/unrelated.git"},
+		"bin":        map[string]string{"spynel": "npm/bin/spynel.js"},
+	})
+	if err := os.WriteFile(filepath.Join(root, "package.json"), metadata, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	called := false
+	if err := manager.StopLegacyNPM(t.Context(), func(string) error { called = true; return nil }); err == nil || called {
+		t.Fatal("unrelated npm package entered lifecycle cleanup")
+	}
+}

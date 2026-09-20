@@ -168,6 +168,14 @@ function removeVerifiedLegacyGlobalPackage(packageRoot = path.resolve(__dirname,
   if (legacy.name !== LEGACY_PACKAGE || repository !== LEGACY_REPOSITORY ||
       !legacy.bin || legacy.bin.spynel !== "npm/bin/spynel.js") return;
 
+  const cleanup = childProcess.spawnSync(path.join(packageRoot, "npm", "vendor", "iris"), ["cleanup-legacy-npm", "--root", legacyRoot], {
+    stdio: "inherit",
+    timeout: 30_000,
+    windowsHide: false,
+  });
+  if (cleanup.error) throw cleanup.error;
+  if (cleanup.status !== 0) throw new Error(`legacy Spynel cleanup exited with status ${cleanup.status}`);
+
   const result = childProcess.spawnSync(npm, ["uninstall", "--global", LEGACY_PACKAGE], {
     stdio: "inherit",
     timeout: 120_000,

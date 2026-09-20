@@ -151,6 +151,73 @@ func uninstallNPMRoot(root string) bool {
 	return err == nil && len(data) <= 65536 && json.Unmarshal(data, &metadata) == nil && metadata.Name == "@edheltzel/iris"
 }
 
+func (m *Manager) StopLegacyNPM(ctx context.Context, removeStartup func(string) error) error {
+	root := m.PackageRoot
+	if !filepath.IsAbs(root) || root == string(filepath.Separator) {
+		return errors.New("legacy npm cleanup requires an absolute package directory")
+	}
+	root = filepath.Clean(root)
+	info, err := os.Lstat(root)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return errors.New("refusing to clean a legacy npm package symlink or file")
+	}
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		return err
+	}
+	modules := filepath.Dir(root)
+	if filepath.Base(modules) != "node_modules" || filepath.Base(filepath.Dir(modules)) != "lib" {
+		return errors.New("unsupported legacy global npm installation layout")
+	}
+	if !validLegacyNPMRoot(root) {
+		return errors.New("refusing to clean an unmanaged legacy npm package")
+	}
+	m.PackageRoot = root
+	if err := removeStartup(root); err != nil {
+		return err
+	}
+	return m.stopProcesses(ctx, root)
+}
+
+func validLegacyNPMRoot(root string) bool {
+	manifestPath := filepath.Join(root, "package.json")
+	markerPath := filepath.Join(root, "npm", "vendor", ".installed.json")
+	for _, path := range []string{manifestPath, markerPath} {
+		info, err := os.Lstat(path)
+		if err != nil || !info.Mode().IsRegular() || info.Size() > 65536 {
+			return false
+		}
+	}
+	if !validNPMRootPackage(root, "", "spynel") {
+		return false
+	}
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return false
+	}
+	var metadata struct {
+		Repository json.RawMessage   `json:"repository"`
+		Bin        map[string]string `json:"bin"`
+	}
+	if json.Unmarshal(data, &metadata) != nil || metadata.Bin["spynel"] != "npm/bin/spynel.js" {
+		return false
+	}
+	var repository string
+	if json.Unmarshal(metadata.Repository, &repository) != nil {
+		var value struct {
+			URL string `json:"url"`
+		}
+		if json.Unmarshal(metadata.Repository, &value) != nil {
+			return false
+		}
+		repository = value.URL
+	}
+	return repository == "git+https://github.com/agent0ai/spynel.git"
+}
+
 func installationLink(path, root string) bool {
 	target, err := os.Readlink(path)
 	if err != nil {

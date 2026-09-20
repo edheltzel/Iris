@@ -141,6 +141,8 @@ func run(args []string, version string) error {
 		return runInstallBundle(args[1:], version)
 	case "uninstall-bundles":
 		return runUninstallBundles(args[1:])
+	case "cleanup-legacy-npm":
+		return runCleanupLegacyNPM(args[1:])
 	case "killall":
 		if len(args) != 1 {
 			return errors.New("usage: iris killall")

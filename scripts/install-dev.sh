@@ -79,8 +79,14 @@ chmod 0755 "$staged"
 mv -f "$staged" "$target"
 trap - EXIT HUP INT TERM
 legacy_target="$bin_dir/spynel"
-if [ -f "$legacy_target" ] || [ -L "$legacy_target" ]; then
-  rm -f "$legacy_target"
+if [ -L "$legacy_target" ]; then
+  if [ "$legacy_target" -ef "$built_binary" ] || [ "$legacy_target" -ef "$target" ]; then
+    unlink "$legacy_target"
+  else
+    echo "Warning: leaving unowned legacy command: $legacy_target" >&2
+  fi
+elif [ -e "$legacy_target" ]; then
+  echo "Warning: leaving unowned legacy command: $legacy_target" >&2
 fi
 
 path_contains() {

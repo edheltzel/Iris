@@ -17,6 +17,28 @@ import (
 	"github.com/edheltzel/iris/internal/updater"
 )
 
+func runCleanupLegacyNPM(args []string) error {
+	flags := flag.NewFlagSet("cleanup-legacy-npm", flag.ContinueOnError)
+	root := flags.String("root", "", "legacy npm package directory")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 || !filepath.IsAbs(*root) {
+		return errors.New("cleanup-legacy-npm requires an absolute root")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	installation := &updater.Manager{PackageRoot: *root}
+	return installation.StopLegacyNPM(ctx, func(root string) error {
+		manager, err := startup.New(filepath.Join(root, "npm", "vendor", "spynel"))
+		if err != nil {
+			return err
+		}
+		manager.NPMLauncher = filepath.Join(root, "npm", "bin", "spynel.js")
+		return manager.RemoveInstallation(ctx, os.Getuid())
+	})
+}
+
 func runUninstallBundles(args []string) error {
 	flags := flag.NewFlagSet("uninstall-bundles", flag.ContinueOnError)
 	root := flags.String("root", "", "standalone installation directory")
