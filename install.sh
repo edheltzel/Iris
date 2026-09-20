@@ -59,9 +59,25 @@ main() {
   case "$install_root" in /*) ;; *) echo 'SPYNEL_INSTALL_DIR must be absolute.' >&2; exit 1 ;; esac
   case "$bin_dir" in /*) ;; *) echo 'SPYNEL_BIN_DIR must be absolute.' >&2; exit 1 ;; esac
   case "$bin_dir" in *:*) echo 'SPYNEL_BIN_DIR cannot contain a PATH separator (:).' >&2; exit 1 ;; esac
+  prior_bin_dir=
   bin_sudo=
   if [ "$uninstalling" = false ]; then
+    bin_record="$install_root/.bin-dir"
+    if [ -f "$bin_record" ] && [ ! -L "$bin_record" ] &&
+       [ "$(wc -c < "$bin_record")" -le 4096 ] && [ "$(wc -l < "$bin_record")" -eq 1 ]; then
+      IFS= read -r prior_bin_dir < "$bin_record" || prior_bin_dir=
+      case "$prior_bin_dir" in /*) ;; *) prior_bin_dir= ;; esac
+      case "$prior_bin_dir" in *:*) prior_bin_dir= ;; esac
+    fi
+    needs_bin_sudo=false
     if ! mkdir -p "$bin_dir" 2>/dev/null || [ ! -w "$bin_dir" ]; then
+      needs_bin_sudo=true
+    fi
+    if [ -n "$prior_bin_dir" ] && [ ! -w "$prior_bin_dir" ] &&
+       [ -L "$prior_bin_dir/spynel" ] && [ "$(readlink "$prior_bin_dir/spynel" 2>/dev/null || true)" = "$install_root/spynel" ]; then
+      needs_bin_sudo=true
+    fi
+    if [ "$needs_bin_sudo" = true ]; then
       command -v sudo >/dev/null 2>&1 || { echo 'Administrator access is required to install Iris on PATH; sudo is unavailable.' >&2; exit 1; }
       echo 'Administrator access is required to install the Iris command.' >&2
       sudo -v
@@ -129,9 +145,12 @@ main() {
     echo "Preserved the existing $bin_dir/iris. Run: \"$install_root/iris\""
     return 1
   fi
-  if [ -L "$bin_dir/spynel" ] && [ "$(readlink "$bin_dir/spynel" 2>/dev/null || true)" = "$install_root/spynel" ]; then
-    $bin_sudo rm -f "$bin_dir/spynel"
-  fi
+  for directory in "$bin_dir" "$prior_bin_dir"; do
+    if [ -n "$directory" ] && [ -L "$directory/spynel" ] &&
+       [ "$(readlink "$directory/spynel" 2>/dev/null || true)" = "$install_root/spynel" ]; then
+      $bin_sudo rm -f "$directory/spynel"
+    fi
+  done
   printf '%s\n' "$bin_dir" > "$install_root/.bin-dir"
   quoted_bin=$(shell_quote "$bin_dir")
   path_line="case \":\$PATH:\" in *:$quoted_bin:*) ;; *) export PATH=$quoted_bin:\$PATH ;; esac # Iris installer"

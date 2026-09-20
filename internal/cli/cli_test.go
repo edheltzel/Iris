@@ -37,6 +37,29 @@ type heldCLIHarness struct {
 	threads map[string]string
 }
 
+func TestMain(m *testing.M) {
+	root, err := os.MkdirTemp("", "iris-cli-test-")
+	if err != nil {
+		panic(err)
+	}
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		panic(err)
+	}
+	for name, value := range map[string]string{
+		"HOME":            filepath.Join(root, "home"),
+		"XDG_CONFIG_HOME": filepath.Join(root, "config"),
+		"XDG_CACHE_HOME":  filepath.Join(root, "cache"),
+	} {
+		if err := os.Setenv(name, value); err != nil {
+			panic(err)
+		}
+	}
+	code := m.Run()
+	_ = os.RemoveAll(root)
+	os.Exit(code)
+}
+
 func TestRecordCommandFailurePersistsGenericEvidenceWithoutErrorContent(t *testing.T) {
 	root := t.TempDir()
 	if err := workspace.Init(root, false); err != nil {

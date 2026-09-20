@@ -98,10 +98,12 @@ func (m *Manager) Uninstall(ctx context.Context, removeStartup func() error) err
 		if !filepath.IsAbs(directory) {
 			continue
 		}
-		path := filepath.Join(directory, "iris")
-		if installationLink(path, root) {
-			if err := os.Remove(path); err != nil {
-				return err
+		for _, name := range []string{"iris", "spynel"} {
+			path := filepath.Join(directory, name)
+			if installationLink(path, root) {
+				if err := os.Remove(path); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -117,7 +119,15 @@ func (m *Manager) Uninstall(ctx context.Context, removeStartup func() error) err
 			}
 		}
 	}
-	for _, name := range []string{"current", "iris", "env", ".bin-dir", ".spynel-install", ".install.lock"} {
+	for _, name := range []string{"iris", "spynel"} {
+		path := filepath.Join(root, name)
+		if target, err := os.Readlink(path); err == nil && target == filepath.Join("current", name) {
+			if err := os.Remove(path); err != nil {
+				return err
+			}
+		}
+	}
+	for _, name := range []string{"current", "env", ".bin-dir", ".spynel-install", ".install.lock"} {
 		if err := os.Remove(filepath.Join(root, name)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
@@ -151,7 +161,7 @@ func installationLink(path, root string) bool {
 	}
 	parent, err := filepath.EvalSymlinks(filepath.Dir(target))
 	resolvedRoot, rootErr := filepath.EvalSymlinks(root)
-	return err == nil && rootErr == nil && parent == resolvedRoot && filepath.Base(target) == "iris"
+	return err == nil && rootErr == nil && parent == resolvedRoot && filepath.Base(target) == filepath.Base(path)
 }
 
 func installationLauncherDirectories(root, home string) ([]string, error) {
@@ -188,8 +198,10 @@ func (m *Manager) NeedsAdministrator() bool {
 		return true
 	}
 	for _, directory := range paths {
-		if installationLink(filepath.Join(directory, "iris"), root) && !installationWritable(directory) {
-			return true
+		for _, name := range []string{"iris", "spynel"} {
+			if installationLink(filepath.Join(directory, name), root) && !installationWritable(directory) {
+				return true
+			}
 		}
 	}
 	return false

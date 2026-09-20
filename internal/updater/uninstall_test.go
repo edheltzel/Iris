@@ -115,6 +115,27 @@ func TestUninstallStopsOnlyOwnedProcessesAndPreservesWorkspace(t *testing.T) {
 	if err := os.Symlink(filepath.Join(root, "iris"), launcher); err != nil {
 		t.Fatal(err)
 	}
+	legacyLauncher := filepath.Join(bin, "spynel")
+	if err := os.Symlink(filepath.Join(root, "spynel"), legacyLauncher); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join("current", "spynel"), filepath.Join(root, "spynel")); err != nil {
+		t.Fatal(err)
+	}
+	recordedBin := t.TempDir()
+	recordedLegacyLauncher := filepath.Join(recordedBin, "spynel")
+	if err := os.Symlink(filepath.Join(root, "spynel"), recordedLegacyLauncher); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".bin-dir"), []byte(recordedBin+"\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	unmanagedBin := t.TempDir()
+	unmanagedLauncher := filepath.Join(unmanagedBin, "spynel")
+	if err := os.Symlink(filepath.Join(t.TempDir(), "spynel"), unmanagedLauncher); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", unmanagedBin+string(os.PathListSeparator)+bin)
 	manager := &Manager{InstallRoot: root}
 	removedStartup := false
 	err = manager.Uninstall(t.Context(), func() error {
@@ -138,8 +159,13 @@ func TestUninstallStopsOnlyOwnedProcessesAndPreservesWorkspace(t *testing.T) {
 	if err := unrelated.Process.Signal(syscall.Signal(0)); err != nil {
 		t.Fatal("unrelated process was stopped")
 	}
-	if _, err := os.Lstat(launcher); !errors.Is(err, os.ErrNotExist) {
-		t.Fatal("owned launcher remains")
+	for _, path := range []string{launcher, legacyLauncher, recordedLegacyLauncher, filepath.Join(root, "spynel")} {
+		if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("owned launcher remains: %s", path)
+		}
+	}
+	if _, err := os.Lstat(unmanagedLauncher); err != nil {
+		t.Fatal("unmanaged launcher was removed")
 	}
 	data, err := os.ReadFile(filepath.Join(workspace, "config.yaml"))
 	if err != nil || string(data) != "keep workspace data\n" {

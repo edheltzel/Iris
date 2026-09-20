@@ -176,8 +176,11 @@ def main():
             assert seeded.returncode == 0, seeded.stderr.decode()
             legacy_launcher = install / "spynel"
             old_executable = legacy_launcher.resolve()
+            prior_bin = temp / "prior user bin"
+            prior_bin.mkdir()
             (user_bin / "spynel").symlink_to(legacy_launcher)
-            (install / ".bin-dir").write_text(str(user_bin) + "\n")
+            (prior_bin / "spynel").symlink_to(legacy_launcher)
+            (install / ".bin-dir").write_text(str(prior_bin) + "\n")
             old_output = subprocess.run([str(legacy_launcher), "--version"], cwd=workspace, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
             assert old_output.returncode == 0 and old_output.stdout.strip() == "spynel " + old_version, old_output.stderr
             assert (old_executable.parent / "licenses" / "onnxruntime" / "LICENSE").is_file()
@@ -202,6 +205,7 @@ def main():
             assert run("version", "--quiet") == ""
             assert not legacy_launcher.exists() and not legacy_launcher.is_symlink()
             assert not (user_bin / "spynel").exists() and not (user_bin / "spynel").is_symlink()
+            assert not (prior_bin / "spynel").exists() and not (prior_bin / "spynel").is_symlink()
             new_executable = (install / "iris").resolve()
             assert (new_executable.parent / "licenses" / "onnxruntime" / "LICENSE").is_file()
             assert old_executable.exists(), "prior-generation runtime was removed"
