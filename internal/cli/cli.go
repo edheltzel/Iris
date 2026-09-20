@@ -109,6 +109,26 @@ func configPathArgument(args []string) string {
 	return ""
 }
 
+func startupManagerForProcess(record updater.ProcessRegistration) (*startupmanager.Manager, error) {
+	executable := record.Executable
+	npmLauncher := ""
+	if record.Installation != "" && filepath.Base(filepath.Dir(record.Executable)) == "vendor" {
+		launcher := "iris.js"
+		if filepath.Base(record.Executable) == "spynel" {
+			launcher = "spynel.js"
+		}
+		npmLauncher = filepath.Join(record.Installation, "npm", "bin", launcher)
+	} else if record.Installation != "" && filepath.Base(record.Executable) == "spynel" {
+		executable = filepath.Join(record.Installation, "spynel")
+	}
+	manager, err := startupmanager.New(executable)
+	if err != nil {
+		return nil, err
+	}
+	manager.NPMLauncher = npmLauncher
+	return manager, nil
+}
+
 func run(args []string, version string) error {
 	if bareInteractiveRequested(args) {
 		return runBareInteractive(version)
@@ -135,13 +155,9 @@ func run(args []string, version string) error {
 			records = append(records, updater.ProcessRegistration{Executable: executable, Installation: updater.Detect(version).InstallationRoot()})
 			seen := make(map[string]bool)
 			for _, record := range records {
-				manager, err := startupmanager.New(record.Executable)
+				manager, err := startupManagerForProcess(record)
 				if err != nil {
 					return err
-				}
-				manager.NPMLauncher = ""
-				if record.Installation != "" && filepath.Base(filepath.Dir(record.Executable)) == "vendor" {
-					manager.NPMLauncher = filepath.Join(record.Installation, "npm", "bin", "iris.js")
 				}
 				key := manager.Executable + "\x00" + manager.NPMLauncher
 				if seen[key] {

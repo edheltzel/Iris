@@ -60,6 +60,29 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+func TestStartupManagerForLegacyProcess(t *testing.T) {
+	root := t.TempDir()
+	for _, test := range []struct {
+		name         string
+		executable   string
+		wantCommand  string
+		wantLauncher string
+	}{
+		{name: "standalone", executable: filepath.Join(root, "releases", "old", "spynel"), wantCommand: filepath.Join(root, "spynel")},
+		{name: "npm", executable: filepath.Join(root, "npm", "vendor", "spynel"), wantCommand: filepath.Join(root, "npm", "vendor", "spynel"), wantLauncher: filepath.Join(root, "npm", "bin", "spynel.js")},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			manager, err := startupManagerForProcess(updater.ProcessRegistration{Executable: test.executable, Installation: root})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if manager.Executable != test.wantCommand || manager.NPMLauncher != test.wantLauncher {
+				t.Fatalf("startup owner = %q, %q; want %q, %q", manager.Executable, manager.NPMLauncher, test.wantCommand, test.wantLauncher)
+			}
+		})
+	}
+}
+
 func TestRecordCommandFailurePersistsGenericEvidenceWithoutErrorContent(t *testing.T) {
 	root := t.TempDir()
 	if err := workspace.Init(root, false); err != nil {

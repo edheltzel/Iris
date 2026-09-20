@@ -74,6 +74,13 @@ func (m *Manager) MigrateInstallation(ctx context.Context, from, to string) erro
 				return m.rollbackMigration(ctx, changed, err)
 			}
 			changed = append(changed, changedRegistration{path: path, data: data, system: system})
+			if m.GOOS == "darwin" {
+				loaded, err := m.reloadLaunchdRegistration(ctx, path, system, false)
+				changed[len(changed)-1].loaded = loaded
+				if err != nil {
+					return m.rollbackMigration(ctx, changed, err)
+				}
+			}
 		}
 	}
 	if m.GOOS == "linux" {
@@ -95,6 +102,7 @@ type changedRegistration struct {
 	path   string
 	data   []byte
 	system bool
+	loaded bool
 }
 
 func (m *Manager) rollbackMigration(ctx context.Context, changed []changedRegistration, cause error) error {
@@ -104,8 +112,16 @@ func (m *Manager) rollbackMigration(ctx context.Context, changed []changedRegist
 		registration := changed[index]
 		if err := fsx.AtomicWriteFile(registration.path, registration.data, 0o600); err != nil {
 			errorsFound = append(errorsFound, err)
+			continue
 		}
-		reload[registration.system] = true
+		if m.GOOS == "darwin" && registration.loaded {
+			if _, err := m.reloadLaunchdRegistration(ctx, registration.path, registration.system, true); err != nil {
+				errorsFound = append(errorsFound, err)
+			}
+		}
+		if m.GOOS == "linux" {
+			reload[registration.system] = true
+		}
 	}
 	if m.GOOS == "linux" {
 		for system := range reload {
@@ -126,6 +142,35 @@ func (m *Manager) writeMigratedRegistration(ctx context.Context, path string, da
 		arguments = append(arguments, "--user")
 	}
 	return m.writeValidated(ctx, path, data, "systemd-analyze", arguments...)
+}
+
+func (m *Manager) reloadLaunchdRegistration(ctx context.Context, path string, system, wantLoaded bool) (bool, error) {
+	domain := "gui/" + strconv.Itoa(os.Getuid())
+	if system {
+		domain = "system"
+	}
+	name := strings.TrimSuffix(filepath.Base(path), ".plist")
+	service := domain + "/" + name
+	if _, err := m.run(ctx, "launchctl", "bootout", service); err == nil {
+		wantLoaded = true
+	} else {
+		output, queryErr := m.run(ctx, "launchctl", "print", service)
+		if queryErr == nil || ctx.Err() != nil || !launchdServiceMissing(output, queryErr) {
+			return true, fmt.Errorf("stop startup registration %s: %w", name, err)
+		}
+	}
+	if !wantLoaded {
+		return false, nil
+	}
+	if _, err := m.run(ctx, "launchctl", "bootstrap", domain, path); err != nil {
+		return true, fmt.Errorf("reload startup registration %s: %w", name, err)
+	}
+	return true, nil
+}
+
+func launchdServiceMissing(output string, err error) bool {
+	detail := output + fmt.Sprint(err)
+	return strings.Contains(detail, "Could not find service") || strings.Contains(detail, "Could not find domain")
 }
 
 func (m *Manager) reloadMigratedRegistrations(ctx context.Context, system bool) error {
@@ -237,7 +282,7 @@ func (m *Manager) stopInstallation(ctx context.Context, userID int, remove bool)
 				service := domain + "/" + strings.TrimSuffix(name, ".plist")
 				if _, err := runCommand(ctx, m.Log, "launchctl", "bootout", service); err != nil {
 					// An installed plist need not have been loaded this login.
-					if output, queryErr := runCommand(ctx, m.Log, "launchctl", "print", service); queryErr == nil || ctx.Err() != nil || !(strings.Contains(output+fmt.Sprint(queryErr), "Could not find service") || strings.Contains(output+fmt.Sprint(queryErr), "Could not find domain")) {
+					if output, queryErr := runCommand(ctx, m.Log, "launchctl", "print", service); queryErr == nil || ctx.Err() != nil || !launchdServiceMissing(output, queryErr) {
 						return fmt.Errorf("stop startup registration %s: %w", name, err)
 					}
 				}

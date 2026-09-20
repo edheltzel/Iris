@@ -9,6 +9,11 @@ binary="$project_dir/.tmp-bin/iris"
 "$script_dir/dev.sh" build >/dev/null
 smoke_dir=$(mktemp -d "${TMPDIR:-/tmp}/iris-smoke.XXXXXX")
 trap 'rm -rf "$smoke_dir"' EXIT HUP INT TERM
+HOME="$smoke_dir/home"
+XDG_CONFIG_HOME="$HOME/.config"
+XDG_CACHE_HOME="$HOME/.cache"
+export HOME XDG_CONFIG_HOME XDG_CACHE_HOME
+mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME"
 
 dev_bin_dir="$smoke_dir/user bin"
 other_bin_dir="$smoke_dir/other bin"

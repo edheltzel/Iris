@@ -162,7 +162,9 @@ func TestMigrateInstallation(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			var calls []string
 			run := func(_ context.Context, name string, args ...string) (string, error) {
+				calls = append(calls, strings.Join(append([]string{name}, args...), " "))
 				if name == "launchctl" && args[0] == "print-disabled" {
 					return "disabled services = {\n}\n", nil
 				}
@@ -195,8 +197,20 @@ func TestMigrateInstallation(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			calls = nil
 			if err := manager.MigrateInstallation(t.Context(), oldExecutable, newExecutable); err != nil {
 				t.Fatal(err)
+			}
+			if platform == "darwin" {
+				domain := "gui/" + strconv.Itoa(os.Getuid())
+				commands := strings.Join(calls, "\n")
+				if !strings.Contains(commands, "launchctl bootout "+domain+"/"+strings.TrimSuffix(name, ".plist")) ||
+					!strings.Contains(commands, "launchctl bootstrap "+domain+" "+filepath.Join(directory, name)) {
+					t.Fatalf("launchd migration did not reload the owned job: %s", commands)
+				}
+				if strings.Contains(commands, strings.TrimSuffix(otherName, ".plist")) {
+					t.Fatalf("launchd migration touched unrelated job: %s", commands)
+				}
 			}
 			data, err := os.ReadFile(filepath.Join(directory, name))
 			if err != nil {
