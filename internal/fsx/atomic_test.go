@@ -85,3 +85,30 @@ func TestMigrateDirAcceptsConcurrentCopyWinner(t *testing.T) {
 		t.Fatalf("published destination = %v, err = %v", info, err)
 	}
 }
+
+func TestMergeDirPreservesMatchingEntriesAndAddsLeftovers(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "legacy", "iris")
+	dest := filepath.Join(root, "agents", "Iris")
+	for _, directory := range []string{source, dest} {
+		if err := os.MkdirAll(filepath.Join(directory, "nested"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(directory, "nested", "shared"), []byte("same"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(source, "leftover"), []byte("kept"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := MergeDir(dest, source); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(dest, "leftover"))
+	if err != nil || string(data) != "kept" {
+		t.Fatalf("merged leftover = %q, %v", data, err)
+	}
+	if _, err := os.Stat(source); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("merged source remains: %v", err)
+	}
+}

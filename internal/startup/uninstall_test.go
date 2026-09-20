@@ -171,6 +171,9 @@ func TestMigrateInstallation(t *testing.T) {
 				if name == "systemctl" && strings.Contains(strings.Join(args, " "), "list-unit-files") {
 					return args[len(args)-1] + " enabled enabled\n", nil
 				}
+				if name == "systemctl" && strings.Contains(strings.Join(args, " "), "--property=ActiveState") {
+					return "active\n", nil
+				}
 				return "", nil
 			}
 			manager := &Manager{GOOS: platform, Home: home, Executable: oldExecutable, SystemLaunchDirectory: filepath.Join(home, "system"), RunCommand: run}
@@ -201,15 +204,22 @@ func TestMigrateInstallation(t *testing.T) {
 			if err := manager.MigrateInstallation(t.Context(), oldExecutable, newExecutable); err != nil {
 				t.Fatal(err)
 			}
+			commands := strings.Join(calls, "\n")
 			if platform == "darwin" {
 				domain := "gui/" + strconv.Itoa(os.Getuid())
-				commands := strings.Join(calls, "\n")
 				if !strings.Contains(commands, "launchctl bootout "+domain+"/"+strings.TrimSuffix(name, ".plist")) ||
 					!strings.Contains(commands, "launchctl bootstrap "+domain+" "+filepath.Join(directory, name)) {
 					t.Fatalf("launchd migration did not reload the owned job: %s", commands)
 				}
 				if strings.Contains(commands, strings.TrimSuffix(otherName, ".plist")) {
 					t.Fatalf("launchd migration touched unrelated job: %s", commands)
+				}
+			} else {
+				if !strings.Contains(commands, "systemctl --no-ask-password --user restart "+name) {
+					t.Fatalf("systemd migration did not restart the active owned unit: %s", commands)
+				}
+				if strings.Contains(commands, "restart "+otherName) {
+					t.Fatalf("systemd migration touched unrelated unit: %s", commands)
 				}
 			}
 			data, err := os.ReadFile(filepath.Join(directory, name))

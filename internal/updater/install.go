@@ -23,6 +23,8 @@ import (
 
 const ownershipMarker = "spynel-github-v1\n"
 
+var removeLegacyLauncher = os.Remove
+
 type bundleMetadata struct {
 	Version string `json:"version"`
 	OS      string `json:"os"`
@@ -244,11 +246,12 @@ func InstallArchive(ctx context.Context, root, archive, checksums, version strin
 		if err := migrateLegacyStartup(ctx, legacyLauncher, launcher); err != nil {
 			return "", rollbackCurrent(err)
 		}
-		if err := os.Remove(legacyLauncher); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := removeLegacyLauncher(legacyLauncher); err != nil && !errors.Is(err, os.ErrNotExist) {
+			cause := fmt.Errorf("remove legacy launcher: %w", err)
 			if reverseErr := migrateLegacyStartup(ctx, launcher, legacyLauncher); reverseErr != nil {
-				return "", errors.Join(err, reverseErr)
+				cause = errors.Join(cause, fmt.Errorf("reverse startup migration: %w", reverseErr))
 			}
-			return "", rollbackCurrent(err)
+			return "", rollbackCurrent(cause)
 		}
 	}
 	return launcher, nil

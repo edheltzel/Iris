@@ -70,6 +70,7 @@ func TestEnvironmentIDMigratesLegacyNamespaces(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			home := t.TempDir()
 			t.Setenv("HOME", home)
+			t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 			configDirectory, err := os.UserConfigDir()
 			if err != nil {
 				t.Fatal(err)
@@ -95,6 +96,111 @@ func TestEnvironmentIDMigratesLegacyNamespaces(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEnvironmentIDResolvesDualLegacyNamespaces(t *testing.T) {
+	t.Run("prefers token source", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+		config, err := os.UserConfigDir()
+		if err != nil {
+			t.Fatal(err)
+		}
+		root := filepath.Join(home, ".agents", "Iris")
+		if err := os.MkdirAll(root, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, "existing"), []byte("kept"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		iris := filepath.Join(config, "iris")
+		spynel := filepath.Join(config, "spynel")
+		for _, directory := range []string{iris, spynel} {
+			if err := os.MkdirAll(directory, 0o700); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := os.WriteFile(filepath.Join(iris, "leftover"), []byte("not selected"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		token := strings.Repeat("cd", environmentTokenBytes)
+		if err := os.WriteFile(filepath.Join(spynel, "environment-token"), []byte(token+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := EnvironmentID(); err != nil {
+			t.Fatal(err)
+		}
+		data, err := os.ReadFile(filepath.Join(root, "environment-token"))
+		if err != nil || strings.TrimSpace(string(data)) != token {
+			t.Fatalf("selected token = %q, %v", data, err)
+		}
+		if _, err := os.Stat(spynel); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("selected source remains: %v", err)
+		}
+		if _, err := os.Stat(filepath.Join(iris, "leftover")); err != nil {
+			t.Fatalf("unselected source changed: %v", err)
+		}
+	})
+
+	t.Run("rejects two tokens", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+		config, err := os.UserConfigDir()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for index, name := range []string{"iris", "spynel"} {
+			directory := filepath.Join(config, name)
+			if err := os.MkdirAll(directory, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			token := strings.Repeat([]string{"ab", "cd"}[index], environmentTokenBytes)
+			if err := os.WriteFile(filepath.Join(directory, "environment-token"), []byte(token+"\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := EnvironmentID(); err == nil || !strings.Contains(err.Error(), "both legacy environment identity sources contain tokens") {
+			t.Fatalf("dual-token error = %v", err)
+		}
+		if _, err := os.Stat(filepath.Join(home, ".agents", "Iris", "environment-token")); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("destination token unexpectedly published: %v", err)
+		}
+	})
+
+	t.Run("merges tokenless leftovers", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+		config, err := os.UserConfigDir()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for name, file := range map[string]string{"spynel": "from-spynel", "iris": "from-iris"} {
+			directory := filepath.Join(config, name)
+			if err := os.MkdirAll(directory, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(directory, file), []byte(name), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := EnvironmentID(); err != nil {
+			t.Fatal(err)
+		}
+		root := filepath.Join(home, ".agents", "Iris")
+		for _, file := range []string{"from-spynel", "from-iris"} {
+			if _, err := os.Stat(filepath.Join(root, file)); err != nil {
+				t.Fatalf("missing merged file %s: %v", file, err)
+			}
+		}
+		for _, name := range []string{"spynel", "iris"} {
+			if _, err := os.Stat(filepath.Join(config, name)); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("legacy source %s remains: %v", name, err)
+			}
+		}
+	})
 }
 
 func TestLeasePublishesEnvironmentAndLegacyOwnerRemainsFenced(t *testing.T) {

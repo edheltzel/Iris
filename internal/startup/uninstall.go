@@ -71,10 +71,17 @@ func (m *Manager) MigrateInstallation(ctx context.Context, from, to string) erro
 			if !matches {
 				continue
 			}
+			registration := changedRegistration{path: path, data: data, system: system}
+			if m.GOOS == "linux" {
+				registration.loaded, err = m.systemdRegistrationActive(ctx, path, system)
+				if err != nil {
+					return m.rollbackMigration(ctx, changed, err)
+				}
+			}
 			if err := m.writeMigratedRegistration(ctx, path, updated, system); err != nil {
 				return m.rollbackMigration(ctx, changed, err)
 			}
-			changed = append(changed, changedRegistration{path: path, data: data, system: system})
+			changed = append(changed, registration)
 			if m.GOOS == "darwin" {
 				loaded, err := m.reloadLaunchdRegistration(ctx, path, system, false)
 				changed[len(changed)-1].loaded = loaded
@@ -85,15 +92,24 @@ func (m *Manager) MigrateInstallation(ctx context.Context, from, to string) erro
 		}
 	}
 	if m.GOOS == "linux" {
-		reloaded := make(map[bool]bool)
-		for _, registration := range changed {
-			if reloaded[registration.system] {
+		for _, system := range scopes {
+			var active []string
+			found := false
+			for _, registration := range changed {
+				if registration.system != system {
+					continue
+				}
+				found = true
+				if registration.loaded {
+					active = append(active, filepath.Base(registration.path))
+				}
+			}
+			if !found {
 				continue
 			}
-			if err := m.reloadMigratedRegistrations(ctx, registration.system); err != nil {
+			if err := m.reloadMigratedRegistrations(ctx, system, active); err != nil {
 				return m.rollbackMigration(ctx, changed, err)
 			}
-			reloaded[registration.system] = true
 		}
 	}
 	return nil
@@ -110,7 +126,7 @@ func (m *Manager) rollbackMigration(ctx context.Context, changed []changedRegist
 	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
 	errorsFound := []error{cause}
-	reload := make(map[bool]bool)
+	reload := make(map[bool][]string)
 	for index := len(changed) - 1; index >= 0; index-- {
 		registration := changed[index]
 		if err := fsx.AtomicWriteFile(registration.path, registration.data, 0o600); err != nil {
@@ -123,12 +139,21 @@ func (m *Manager) rollbackMigration(ctx context.Context, changed []changedRegist
 			}
 		}
 		if m.GOOS == "linux" {
-			reload[registration.system] = true
+			if _, exists := reload[registration.system]; !exists {
+				reload[registration.system] = nil
+			}
+			if registration.loaded {
+				reload[registration.system] = append(reload[registration.system], filepath.Base(registration.path))
+			}
 		}
 	}
 	if m.GOOS == "linux" {
-		for system := range reload {
-			if err := m.reloadMigratedRegistrations(cleanupCtx, system); err != nil {
+		for _, system := range []bool{false, true} {
+			active, exists := reload[system]
+			if !exists {
+				continue
+			}
+			if err := m.reloadMigratedRegistrations(cleanupCtx, system, active); err != nil {
 				errorsFound = append(errorsFound, err)
 			}
 		}
@@ -176,24 +201,59 @@ func launchdServiceMissing(output string, err error) bool {
 	return strings.Contains(detail, "Could not find service") || strings.Contains(detail, "Could not find domain")
 }
 
-func (m *Manager) reloadMigratedRegistrations(ctx context.Context, system bool) error {
+func (m *Manager) systemdCommand(system bool) ([]string, bool, error) {
 	runtimePath := filepath.Join("/run/user", strconv.Itoa(os.Getuid()))
 	managerPath := filepath.Join(runtimePath, "systemd", "private")
-	arguments := []string{"--no-ask-password", "--user", "daemon-reload"}
+	arguments := []string{"--no-ask-password", "--user"}
 	if value := os.Getenv("XDG_RUNTIME_DIR"); !system && value != "" {
 		managerPath = filepath.Join(value, "systemd", "private")
 	}
 	if system {
 		managerPath = "/run/systemd/system"
-		arguments = []string{"--no-ask-password", "daemon-reload"}
+		arguments = []string{"--no-ask-password"}
 	}
 	if _, err := os.Stat(managerPath); errors.Is(err, os.ErrNotExist) {
-		return nil
+		return arguments, false, nil
 	} else if err != nil {
+		return nil, false, err
+	}
+	return arguments, true, nil
+}
+
+func (m *Manager) systemdRegistrationActive(ctx context.Context, path string, system bool) (bool, error) {
+	arguments, available, err := m.systemdCommand(system)
+	if err != nil || !available {
+		return false, err
+	}
+	name := filepath.Base(path)
+	output, err := m.run(ctx, "systemctl", append(arguments, "show", "--property=ActiveState", "--value", name)...)
+	if err != nil {
+		return false, fmt.Errorf("inspect startup registration %s: %w", name, err)
+	}
+	switch strings.TrimSpace(output) {
+	case "active", "activating", "reloading":
+		return true, nil
+	case "inactive", "failed", "deactivating":
+		return false, nil
+	default:
+		return false, fmt.Errorf("inspect startup registration %s: unrecognized systemd state %q", name, strings.TrimSpace(output))
+	}
+}
+
+func (m *Manager) reloadMigratedRegistrations(ctx context.Context, system bool, active []string) error {
+	arguments, available, err := m.systemdCommand(system)
+	if err != nil || !available {
 		return err
 	}
-	_, err := m.run(ctx, "systemctl", arguments...)
-	return err
+	if _, err := m.run(ctx, "systemctl", append(arguments, "daemon-reload")...); err != nil {
+		return err
+	}
+	for _, name := range active {
+		if _, err := m.run(ctx, "systemctl", append(arguments, "restart", name)...); err != nil {
+			return fmt.Errorf("restart startup registration %s: %w", name, err)
+		}
+	}
+	return nil
 }
 
 func migratedRegistration(data []byte, goos, from, to string) ([]byte, bool, error) {

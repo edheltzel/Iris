@@ -105,14 +105,44 @@ func EnvironmentID() (string, error) {
 		return "", fmt.Errorf("locate environment identity directory: %w", err)
 	}
 	root := filepath.Join(home, ".agents", "Iris")
-	var sources []string
-	if directory, err := os.UserConfigDir(); err == nil {
-		sources = []string{filepath.Join(directory, "iris"), filepath.Join(directory, "spynel")}
-	}
-	if err := fsx.MigrateDir(root, sources...); err != nil {
-		return "", fmt.Errorf("migrate environment identity directory: %w", err)
-	}
 	path := filepath.Join(root, "environment-token")
+	hasToken, err := environmentTokenExists(root)
+	if err != nil {
+		return "", fmt.Errorf("inspect environment identity directory: %w", err)
+	}
+	if !hasToken {
+		if directory, configErr := os.UserConfigDir(); configErr == nil {
+			iris := filepath.Join(directory, "iris")
+			spynel := filepath.Join(directory, "spynel")
+			irisToken, err := environmentTokenExists(iris)
+			if err != nil {
+				return "", fmt.Errorf("inspect Iris identity migration source: %w", err)
+			}
+			spynelToken, err := environmentTokenExists(spynel)
+			if err != nil {
+				return "", fmt.Errorf("inspect Spynel identity migration source: %w", err)
+			}
+			switch {
+			case irisToken && spynelToken:
+				return "", errors.New("both legacy environment identity sources contain tokens")
+			case irisToken:
+				err = fsx.MergeDir(root, iris)
+			case spynelToken:
+				err = fsx.MergeDir(root, spynel)
+			default:
+				err = fsx.MergeDir(root, spynel)
+				if err == nil {
+					hasToken, err = environmentTokenExists(root)
+				}
+				if err == nil && !hasToken {
+					err = fsx.MergeDir(root, iris)
+				}
+			}
+			if err != nil {
+				return "", fmt.Errorf("migrate environment identity directory: %w", err)
+			}
+		}
+	}
 	token, err := readEnvironmentToken(path)
 	if errors.Is(err, os.ErrNotExist) {
 		data := make([]byte, environmentTokenBytes)
@@ -130,6 +160,14 @@ func EnvironmentID() (string, error) {
 	}
 	digest := sha256.Sum256([]byte("spynel-loopback-environment-v1\x00" + token))
 	return hex.EncodeToString(digest[:]), nil
+}
+
+func environmentTokenExists(directory string) (bool, error) {
+	_, err := os.Lstat(filepath.Join(directory, "environment-token"))
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	return err == nil, err
 }
 
 func readEnvironmentToken(path string) (string, error) {

@@ -243,6 +243,44 @@ func TestInstallReplacesOwnedLegacyLauncher(t *testing.T) {
 	if _, err := os.Lstat(filepath.Join(root, "iris")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("Iris launcher published after migration failure: %v", err)
 	}
+	originalRemove := removeLegacyLauncher
+	removalFailure := errors.New("legacy launcher removal failed")
+	removeLegacyLauncher = func(path string) error {
+		if path == filepath.Join(root, "spynel") {
+			return removalFailure
+		}
+		return originalRemove(path)
+	}
+	t.Cleanup(func() { removeLegacyLauncher = originalRemove })
+	reversalFailure := errors.New("startup migration reversal failed")
+	migrationCalls := 0
+	_, err = InstallArchive(context.Background(), root, archive, sums, "1.2.0", func(_ context.Context, from, to string) error {
+		migrationCalls++
+		if migrationCalls == 1 {
+			if from != filepath.Join(root, "spynel") || to != filepath.Join(root, "iris") {
+				t.Fatalf("startup migration = %q -> %q", from, to)
+			}
+			return nil
+		}
+		if from != filepath.Join(root, "iris") || to != filepath.Join(root, "spynel") {
+			t.Fatalf("startup reversal = %q -> %q", from, to)
+		}
+		return reversalFailure
+	})
+	if !errors.Is(err, removalFailure) || !errors.Is(err, reversalFailure) ||
+		!strings.Contains(err.Error(), "remove legacy launcher") || !strings.Contains(err.Error(), "reverse startup migration") {
+		t.Fatalf("mixed migration failure = %v", err)
+	}
+	if target, err := os.Readlink(filepath.Join(root, "current")); err != nil || target != filepath.Join("releases", filepath.Base(legacyBundle)) {
+		t.Fatalf("current after mixed migration failure = %q, %v", target, err)
+	}
+	if _, err := os.Lstat(filepath.Join(root, "spynel")); err != nil {
+		t.Fatal("legacy launcher lost after mixed migration failure:", err)
+	}
+	if _, err := os.Lstat(filepath.Join(root, "iris")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("Iris launcher published after mixed migration failure: %v", err)
+	}
+	removeLegacyLauncher = originalRemove
 	migrated := false
 	launcher, err := InstallArchive(context.Background(), root, archive, sums, "1.2.0", func(_ context.Context, from, to string) error {
 		if from != filepath.Join(root, "spynel") || to != filepath.Join(root, "iris") {
