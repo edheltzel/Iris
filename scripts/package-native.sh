@@ -38,7 +38,7 @@ fi
 
 work_dir=$(mktemp -d)
 trap 'rm -rf "$work_dir"' EXIT HUP INT TERM
-stage_dir="$work_dir/spynel_${version}_${target_os}_${target_arch}"
+stage_dir="$work_dir/iris_${version}_${target_os}_${target_arch}"
 mkdir -p "$stage_dir" "$output_dir"
 
 binary=iris
@@ -92,7 +92,7 @@ cp "$project_dir/internal/channel/tui/textarea/LICENSE" "$stage_dir/licenses/bub
 
 "$stage_dir/$binary" --version >/dev/null
 
-archive_base="spynel_${version}_${target_os}_${target_arch}"
+archive_base="iris_${version}_${target_os}_${target_arch}"
 archive_path=$(CDPATH= cd -- "$output_dir" && pwd)/$archive_base.tar.gz
 tar -C "$stage_dir" -czf "$archive_path" .
 

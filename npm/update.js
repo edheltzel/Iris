@@ -57,7 +57,7 @@ function requestJSON(url, timeoutMs, redirects = 0, deadline = Date.now() + time
     const request = transport.get(parsed, {
       headers: {
         Accept: "application/json",
-        "User-Agent": `spynel/${pkg.version}`
+        "User-Agent": `iris/${pkg.version}`
       }
     }, response => {
       if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {

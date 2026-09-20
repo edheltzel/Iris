@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 )
 
@@ -14,28 +13,23 @@ const speechCacheVersion = "v1"
 // SpeechCacheDir resolves and creates the stable per-user namespace for
 // automatically managed speech assets. Composition injects this path once.
 func SpeechCacheDir() (string, error) {
-	return speechCacheDir(os.UserCacheDir)
-}
-
-func speechCacheDir(resolve func() (string, error)) (string, error) {
-	base, err := resolve()
-	if err != nil || strings.TrimSpace(base) == "" {
+	home, err := os.UserHomeDir()
+	if err != nil || strings.TrimSpace(home) == "" {
 		if err == nil {
 			err = errors.New("platform returned an empty path")
 		}
-		return "", fmt.Errorf("determine operating-system user cache directory for automatic speech assets: %w; configure speech.model_dir explicitly to avoid automatic model provisioning", err)
+		return "", fmt.Errorf("determine operating-system user home directory for automatic speech assets: %w; configure speech.model_dir explicitly to avoid automatic model provisioning", err)
 	}
-	root := speechCachePath(base, runtime.GOOS, "iris")
-	legacy := speechCachePath(base, runtime.GOOS, "spynel")
-	if _, err := os.Lstat(root); os.IsNotExist(err) {
-		if info, err := os.Lstat(legacy); err == nil && info.IsDir() {
-			if err := os.MkdirAll(filepath.Dir(root), 0o700); err != nil {
-				return "", fmt.Errorf("create speech cache parent %q: %w", filepath.Dir(root), err)
-			}
-			if err := os.Rename(legacy, root); err != nil {
-				return "", fmt.Errorf("migrate speech cache from %q to %q: %w", legacy, root, err)
-			}
+	root := filepath.Join(home, ".agents", "Iris", "speech", speechCacheVersion, "parakeet")
+	var sources []string
+	if cache, err := os.UserCacheDir(); err == nil && strings.TrimSpace(cache) != "" {
+		sources = []string{
+			filepath.Join(cache, "iris", "speech", speechCacheVersion, "parakeet"),
+			filepath.Join(cache, "spynel", "speech", speechCacheVersion, "parakeet"),
 		}
+	}
+	if err := migrateInto(root, sources...); err != nil {
+		return "", fmt.Errorf("migrate speech cache to %q: %w", root, err)
 	}
 	if err := os.MkdirAll(root, 0o700); err != nil {
 		return "", fmt.Errorf("create shared speech cache %q: %w; check directory permissions or configure speech.model_dir explicitly", root, err)
@@ -43,18 +37,40 @@ func speechCacheDir(resolve func() (string, error)) (string, error) {
 	return root, nil
 }
 
-func speechCachePath(base, goos, product string) string {
-	separator := "/"
-	if goos == "windows" {
-		separator = `\`
+func migrateInto(dest string, sources ...string) error {
+	if err := os.MkdirAll(filepath.Dir(dest), 0o700); err != nil {
+		return err
 	}
-	trimmed := strings.TrimRight(base, `/\`)
-	if trimmed == "" && strings.HasPrefix(base, separator) {
-		trimmed = separator
+	if _, err := os.Lstat(dest); err == nil {
+		return nil
+	} else if !os.IsNotExist(err) {
+		return err
 	}
-	suffix := strings.Join([]string{product, "speech", speechCacheVersion, "parakeet"}, separator)
-	if trimmed == separator {
-		return trimmed + suffix
+	for _, src := range sources {
+		info, err := os.Lstat(src)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return err
+		}
+		if !info.IsDir() {
+			continue
+		}
+		err = os.Rename(src, dest)
+		if err == nil {
+			return nil
+		}
+		if _, destErr := os.Lstat(dest); destErr == nil {
+			return nil
+		}
+		if os.IsNotExist(err) {
+			if _, destErr := os.Lstat(dest); destErr == nil {
+				return nil
+			}
+			continue
+		}
+		return err
 	}
-	return trimmed + separator + suffix
+	return nil
 }

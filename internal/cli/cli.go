@@ -77,7 +77,7 @@ func recordCommandFailure(args []string, runErr error) {
 		return
 	}
 	runtimeState := app.NewRuntimeAt(cfg.StatePath("runtime", "logs"), fmt.Sprintf("pid-%d-error", os.Getpid()))
-	runtimeState.LogEvent("error", "process", "command_failed", fmt.Sprintf("Spynel command failed (%T)", runErr))
+	runtimeState.LogEvent("error", "process", "command_failed", fmt.Sprintf("Iris command failed (%T)", runErr))
 	runtimeState.Close()
 }
 
@@ -123,7 +123,7 @@ func run(args []string, version string) error {
 		return runUninstallBundles(args[1:])
 	case "killall":
 		if len(args) != 1 {
-			return errors.New("usage: spynel killall")
+			return errors.New("usage: iris killall")
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
@@ -141,7 +141,7 @@ func run(args []string, version string) error {
 				}
 				manager.NPMLauncher = ""
 				if record.Installation != "" && filepath.Base(filepath.Dir(record.Executable)) == "vendor" {
-					manager.NPMLauncher = filepath.Join(record.Installation, "npm", "bin", "spynel.js")
+					manager.NPMLauncher = filepath.Join(record.Installation, "npm", "bin", "iris.js")
 				}
 				key := manager.Executable + "\x00" + manager.NPMLauncher
 				if seen[key] {
@@ -155,25 +155,25 @@ func run(args []string, version string) error {
 			return nil
 		})
 		if err == nil {
-			fmt.Printf("Stopped %d Spynel instance(s).\n", count)
+			fmt.Printf("Stopped %d Iris instance(s).\n", count)
 		}
 		return err
 	case "update":
 		return runUpdateCommand(args[1:], version)
 	case "check-restartable":
 		if len(args) != 1 {
-			return errors.New("usage: spynel check-restartable")
+			return errors.New("usage: iris check-restartable")
 		}
 		return updater.Detect(version).CheckRestartable()
 	case "restart-instances":
 		if len(args) != 1 {
-			return errors.New("usage: spynel restart-instances")
+			return errors.New("usage: iris restart-instances")
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
 		defer cancel()
 		count, err := updater.Detect(version).RestartInstances(ctx, version)
 		if err == nil {
-			fmt.Fprintf(os.Stderr, "Restarted %d other Spynel instance(s).\n", count)
+			fmt.Fprintf(os.Stderr, "Restarted %d other Iris instance(s).\n", count)
 		}
 		return err
 	case "docs":
@@ -187,12 +187,12 @@ func run(args []string, version string) error {
 			return err
 		}
 		if flags.NArg() != 0 {
-			return errors.New("usage: spynel version [--quiet]")
+			return errors.New("usage: iris version [--quiet]")
 		}
 		if *quiet {
 			return nil
 		}
-		fmt.Println("spynel " + version)
+		fmt.Println("iris " + version)
 		return nil
 	case "init":
 		flags := flag.NewFlagSet("init", flag.ContinueOnError)
@@ -206,7 +206,7 @@ func run(args []string, version string) error {
 			return err
 		}
 		absolute, _ := filepath.Abs(*root)
-		fmt.Println("Initialized Spynel in " + absolute)
+		fmt.Println("Initialized Iris in " + absolute)
 		if !*noStart && interactiveTerminal() {
 			configPath := config.PathForRoot(absolute)
 			return runServer(configPath, true, version, []string{"serve", "--tui", "--config", configPath})
@@ -230,7 +230,7 @@ func run(args []string, version string) error {
 			return err
 		}
 		if !*once {
-			return errors.New("run currently requires --once; use 'spynel serve' for the continuous loop")
+			return errors.New("run currently requires --once; use 'iris serve' for the continuous loop")
 		}
 		return runOnce(*configPath, version)
 	case "send":
@@ -252,7 +252,7 @@ func run(args []string, version string) error {
 	case "task", "todo", "goal":
 		if len(args) >= 2 && args[0] != "goal" && args[1] == "inspect" {
 			if len(args) != 3 {
-				return errors.New("usage: spynel task inspect FILE")
+				return errors.New("usage: iris task inspect FILE")
 			}
 			return inspectTaskPolicy(args[2], os.Stdout)
 		}
@@ -263,7 +263,7 @@ func run(args []string, version string) error {
 			requestArgs = requestArgs[1:]
 		}
 		if len(requestArgs) == 0 {
-			return fmt.Errorf("usage: spynel %s [--no-review] <request>", args[0])
+			return fmt.Errorf("usage: iris %s [--no-review] <request>", args[0])
 		}
 		cfg, err := config.Load("")
 		if err != nil {
@@ -307,7 +307,7 @@ func run(args []string, version string) error {
 		}
 		return runFrameworkCLICommand("whatsapp", args[1:], version)
 	default:
-		return fmt.Errorf("unknown command %q; run 'spynel help'", args[0])
+		return fmt.Errorf("unknown command %q; run 'iris help'", args[0])
 	}
 }
 
@@ -464,7 +464,7 @@ func runInstructionsCommand(args []string, output io.Writer) error {
 		return err
 	}
 	if flags.NArg() != 0 {
-		return errors.New("usage: spynel instructions [--config PATH]")
+		return errors.New("usage: iris instructions [--config PATH]")
 	}
 	cfg, err := config.Load(*configPath)
 	if err != nil {
@@ -492,7 +492,7 @@ type restartRequest struct {
 }
 
 func (r *restartRequest) Error() string {
-	return "restart Spynel"
+	return "restart Iris"
 }
 
 type updateRequest struct {
@@ -502,7 +502,7 @@ type updateRequest struct {
 	manager    *updater.Manager
 }
 
-func (*updateRequest) Error() string { return "update and restart Spynel" }
+func (*updateRequest) Error() string { return "update and restart Iris" }
 func (r *updateRequest) ExitCode() int {
 	r.writeRestartArgs()
 	return npmUpdateExitCode
@@ -620,7 +620,7 @@ func runServerWithSocket(configPath string, withTUI bool, version string, restar
 	defer signal.Stop(restartSignals)
 	registered, err := manager.RegisterProcess()
 	if err != nil {
-		return fmt.Errorf("register running Spynel instance: %w", err)
+		return fmt.Errorf("register running Iris instance: %w", err)
 	}
 	defer registered()
 	go func() {
@@ -694,7 +694,7 @@ func runServerWithSocket(configPath string, withTUI bool, version string, restar
 		return serverResult(nil)
 	}
 	if err := updater.MarkProcessReady(); err != nil {
-		return serverResult(fmt.Errorf("confirm running Spynel instance: %w", err))
+		return serverResult(fmt.Errorf("confirm running Iris instance: %w", err))
 	}
 	if launchTUI {
 		themes, themeErr := theme.LoadDir(cfg.StatePath("themes"))
@@ -813,13 +813,13 @@ func newStartupConnectionStatus(output io.Writer, enabled bool) startupConnectio
 
 func (s startupConnectionStatus) connecting() {
 	if s.enabled {
-		fmt.Fprintln(s.output, "Connecting to the existing Spynel primary…")
+		fmt.Fprintln(s.output, "Connecting to the existing Iris primary…")
 	}
 }
 
 func (s startupConnectionStatus) connected() {
 	if s.enabled {
-		fmt.Fprintln(s.output, "Connected to the existing Spynel primary.")
+		fmt.Fprintln(s.output, "Connected to the existing Iris primary.")
 	}
 }
 
@@ -827,11 +827,11 @@ func (s startupConnectionStatus) failed(err error) {
 	if s.enabled {
 		detail := "connection failed; review the error below and retry or exit"
 		if errors.Is(err, localapi.ErrForeignLoopback) {
-			detail = "the workspace primary is active in another host/container environment, so its loopback API is unreachable here; stop that primary or run Spynel in the same environment, then retry"
+			detail = "the workspace primary is active in another host/container environment, so its loopback API is unreachable here; stop that primary or run Iris in the same environment, then retry"
 		} else if errors.Is(err, localapi.ErrReadinessTimeout) {
 			detail = "the existing primary did not become reachable within the bounded startup interval; review the error below, then retry or exit"
 		}
-		fmt.Fprintln(s.output, "Could not connect to the existing Spynel primary: "+detail)
+		fmt.Fprintln(s.output, "Could not connect to the existing Iris primary: "+detail)
 	}
 }
 
@@ -921,7 +921,7 @@ func runMessageMode(configPath, conversation, text, version string, options mess
 	} else if active {
 		return runMessageWithOutput(ctx, client.Handle, conversation, text, options)
 	} else if options.FollowupOnly {
-		return errors.New("followup requires a running Spynel server with an active execution; start `spynel serve` first")
+		return errors.New("followup requires a running Iris server with an active execution; start `iris serve` first")
 	}
 	service, err := buildService(cfg, version)
 	if err != nil {
@@ -1117,7 +1117,7 @@ func writeCLIEvent(output io.Writer, streamed *strings.Builder, event core.Event
 
 func buildService(cfg config.Config, version string) (*app.Service, error) {
 	if err := workspace.Upgrade(cfg.Root); err != nil {
-		return nil, fmt.Errorf("upgrade Spynel workspace: %w", err)
+		return nil, fmt.Errorf("upgrade Iris workspace: %w", err)
 	}
 	runtimeState := app.NewRuntimeAt(cfg.StatePath("runtime", "logs"), fmt.Sprintf("pid-%d", os.Getpid()))
 	registry := harness.NewBuiltinRegistry()
@@ -1258,7 +1258,7 @@ func extensionCommand(args []string) error {
 	switch args[0] {
 	case "install":
 		if len(args) < 2 || len(args) > 3 {
-			return errors.New("usage: spynel extension install <git-url> [name]")
+			return errors.New("usage: iris extension install <git-url> [name]")
 		}
 		name := ""
 		if len(args) == 3 {
@@ -1276,7 +1276,7 @@ func extensionCommand(args []string) error {
 		return nil
 	case "remove":
 		if len(args) != 2 {
-			return errors.New("usage: spynel extension remove <name>")
+			return errors.New("usage: iris extension remove <name>")
 		}
 		if err := extensions.Remove(directory, args[1]); err != nil {
 			return err
@@ -1284,7 +1284,7 @@ func extensionCommand(args []string) error {
 		fmt.Printf("Removed %s; reinstall its Git repository to recover it.\n", args[1])
 		return nil
 	default:
-		return errors.New("usage: spynel extension [list|install <git-url> [name]|remove <name>]")
+		return errors.New("usage: iris extension [list|install <git-url> [name]|remove <name>]")
 	}
 }
 
@@ -1340,15 +1340,15 @@ func enabled(value bool) string {
 	return "disabled"
 }
 
-const helpText = `Spynel - non-AI orchestration for one human and many coding agents
+const helpText = `Iris - non-AI orchestration for one human and many coding agents
 
 Usage:
-  spynel                         Launch TUI and enabled background services
-  spynel serve [--tui] [--socket PATH]
+  iris                         Launch TUI and enabled background services
+  iris serve [--tui] [--socket PATH]
                                 Run channels and orchestration; mirror safe lifecycle logs when headless
-  spynel init [--dir DIR]        Initialize and continue into the TUI
+  iris init [--dir DIR]        Initialize and continue into the TUI
     --no-start                   Initialize only (for scripts and automation)
-  spynel send [flags] TEXT       Send or stream a message
+  iris send [flags] TEXT       Send or stream a message
     --config PATH                Load an explicit workspace configuration
     --conversation NAME          Reuse a durable CLI conversation (default local)
     --stream                     Print response deltas as they arrive
@@ -1357,19 +1357,19 @@ Usage:
     --attach PATH                Copy and attach a file (repeatable)
     --request-id ID              Retain request identity across a deliberate retry
     --socket PATH                Use an explicit private Unix socket
-  spynel events [--config PATH|--socket PATH] [--conversation NAME] [--after CURSOR]
+  iris events [--config PATH|--socket PATH] [--conversation NAME] [--after CURSOR]
                                 Subscribe to committed replies and later notifications
-  spynel followup [flags] TEXT   Steer an active server-side CLI conversation
-  spynel notify --workdir PATH (--origin O | --recent-authorized) --message TEXT
+  iris followup [flags] TEXT   Steer an active server-side CLI conversation
+  iris notify --workdir PATH (--origin O | --recent-authorized) --message TEXT
                                 Queue a proactive assistant notification
-  spynel conversations list     List disk-backed conversations
-  spynel conversations show     Read a bounded conversation tail
-  spynel conversations resume   Branch any saved conversation into CLI
-  spynel status [flags]          Show workspace and current conversation status
-  spynel command [flags] NAME    Run any non-visual framework slash command
-  spynel model|effort|speed ... Inspect or select model inference properties
-  spynel tasks [flags] [VIEW]   List durable tasks (open by default)
-  spynel goals [flags] [VIEW]   List durable goals (open by default)
+  iris conversations list     List disk-backed conversations
+  iris conversations show     Read a bounded conversation tail
+  iris conversations resume   Branch any saved conversation into CLI
+  iris status [flags]          Show workspace and current conversation status
+  iris command [flags] NAME    Run any non-visual framework slash command
+  iris model|effort|speed ... Inspect or select model inference properties
+  iris tasks [flags] [VIEW]   List durable tasks (open by default)
+  iris goals [flags] [VIEW]   List durable goals (open by default)
     VIEW                        open|recent|active|review|waiting|done|failed|all
     --config PATH               Load an explicit workspace configuration
     --conversation NAME         Use a durable CLI command conversation
@@ -1377,26 +1377,26 @@ Usage:
     --limit N                   Render 1 through 100 matching items
     --detail                    Add allowlisted durable details
     --json                      Emit the shared response event as NDJSON
-  spynel job message N TEXT     Guide a live orchestrator job in place
-  spynel job ping N             Request durable progress from a live job
-  spynel docs [TOPIC]            Read curated offline documentation
+  iris job message N TEXT     Guide a live orchestrator job in place
+  iris job ping N             Request durable progress from a live job
+  iris docs [TOPIC]            Read curated offline documentation
     search QUERY [page NUMBER]   Search bounded topic sections
     --format text|json           Select plain Markdown or versioned JSON
-  spynel instructions            Validate role instruction files without showing contents
-  spynel jobs|log...             Other concise framework-command aliases
-  spynel update                 Update and restart every instance of this installation
-  spynel update check           Check versions without updating or restarting
-  spynel killall                Stop all running Spynel instances
-  spynel run --once              Dispatch one orchestration scan and wait
-  spynel task [--no-review] REQUEST
+  iris instructions            Validate role instruction files without showing contents
+  iris jobs|log...             Other concise framework-command aliases
+  iris update                 Update and restart every instance of this installation
+  iris update check           Check versions without updating or restarting
+  iris killall                Stop all running Iris instances
+  iris run --once              Dispatch one orchestration scan and wait
+  iris task [--no-review] REQUEST
                                 Create a task (reviewed by default)
-  spynel task inspect FILE      Show the task's effective review policy
-  spynel goal OBJECTIVE          Create a goal markdown file
-  spynel extension ...           List, install, or remove Git extensions
-  spynel whatsapp pair           Pair a WhatsApp account by QR code
-  spynel config [get|set ...]    Validate config or run the shared config command
-  spynel doctor                  Check local configuration and prerequisites
-  spynel version                 Print the binary version
+  iris task inspect FILE      Show the task's effective review policy
+  iris goal OBJECTIVE          Create a goal markdown file
+  iris extension ...           List, install, or remove Git extensions
+  iris whatsapp pair           Pair a WhatsApp account by QR code
+  iris config [get|set ...]    Validate config or run the shared config command
+  iris doctor                  Check local configuration and prerequisites
+  iris version                 Print the binary version
 `
 
 // runInstallBundle is a workspace-independent entry point used by install.sh.

@@ -33,29 +33,63 @@ type ProcessRegistration struct {
 }
 
 func processDirectory() (string, error) {
-	directory, err := os.UserConfigDir()
+	parent, _ := os.UserConfigDir()
+	directory, err := adoptUserNamespace(parent)
 	if err != nil {
 		return "", err
 	}
-	directory = filepath.Join(adoptUserNamespace(directory), "processes")
+	directory = filepath.Join(directory, "processes")
 	if err := privateDirectory(directory); err != nil {
 		return "", err
 	}
 	return directory, nil
 }
 
-func adoptUserNamespace(parent string) string {
-	next := filepath.Join(parent, "iris")
-	prev := filepath.Join(parent, "spynel")
-	if _, err := os.Lstat(next); err == nil {
-		return next
+func adoptUserNamespace(parent string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
 	}
-	if info, err := os.Lstat(prev); err == nil && info.IsDir() {
-		if err := os.Rename(prev, next); err == nil {
-			return next
+	dest := filepath.Join(home, ".agents", "Iris")
+	if err := os.MkdirAll(filepath.Dir(dest), 0o700); err != nil {
+		return "", err
+	}
+	if _, err := os.Lstat(dest); err == nil {
+		return dest, nil
+	} else if !os.IsNotExist(err) {
+		return "", err
+	}
+	var sources []string
+	if parent != "" {
+		sources = []string{filepath.Join(parent, "iris"), filepath.Join(parent, "spynel")}
+	}
+	for _, src := range sources {
+		info, err := os.Lstat(src)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return "", err
 		}
+		if !info.IsDir() {
+			continue
+		}
+		err = os.Rename(src, dest)
+		if err == nil {
+			return dest, nil
+		}
+		if _, destErr := os.Lstat(dest); destErr == nil {
+			return dest, nil
+		}
+		if os.IsNotExist(err) {
+			if _, destErr := os.Lstat(dest); destErr == nil {
+				return dest, nil
+			}
+			continue
+		}
+		return "", err
 	}
-	return next
+	return dest, nil
 }
 
 func (m *Manager) InstallationRoot() string {

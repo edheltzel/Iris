@@ -17,7 +17,6 @@ func testEnvironmentID(character string) string { return strings.Repeat(characte
 func TestEnvironmentIDIsStablePrivateAndEnvironmentScoped(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("XDG_CONFIG_HOME", home)
 	first, err := EnvironmentID()
 	if err != nil {
 		t.Fatal(err)
@@ -26,8 +25,7 @@ func TestEnvironmentIDIsStablePrivateAndEnvironmentScoped(t *testing.T) {
 	if err != nil || second != first || !validEnvironmentID(first) {
 		t.Fatalf("stable environment ID = %q, %q, %v", first, second, err)
 	}
-	configDirectory, _ := os.UserConfigDir()
-	tokenPath := filepath.Join(configDirectory, "iris", "environment-token")
+	tokenPath := filepath.Join(home, ".agents", "Iris", "environment-token")
 	token, err := os.ReadFile(tokenPath)
 	if err != nil {
 		t.Fatal(err)
@@ -41,10 +39,42 @@ func TestEnvironmentIDIsStablePrivateAndEnvironmentScoped(t *testing.T) {
 	}
 	home2 := t.TempDir()
 	t.Setenv("HOME", home2)
-	t.Setenv("XDG_CONFIG_HOME", home2)
 	separate, err := EnvironmentID()
 	if err != nil || separate == first {
 		t.Fatalf("separate configuration environment ID = %q, first %q, %v", separate, first, err)
+	}
+}
+
+func TestEnvironmentIDMigratesLegacyNamespaces(t *testing.T) {
+	token := strings.Repeat("ab", environmentTokenBytes)
+	for _, name := range []string{"iris", "spynel"} {
+		t.Run(name, func(t *testing.T) {
+			home := t.TempDir()
+			t.Setenv("HOME", home)
+			configDirectory, err := os.UserConfigDir()
+			if err != nil {
+				t.Fatal(err)
+			}
+			legacy := filepath.Join(configDirectory, name)
+			if err := os.MkdirAll(legacy, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(legacy, "environment-token"), []byte(token+"\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			id, err := EnvironmentID()
+			if err != nil || !validEnvironmentID(id) {
+				t.Fatalf("migrated environment ID = %q, %v", id, err)
+			}
+			dest := filepath.Join(home, ".agents", "Iris", "environment-token")
+			got, err := os.ReadFile(dest)
+			if err != nil || strings.TrimSpace(string(got)) != token {
+				t.Fatalf("migrated token = %q, %v", got, err)
+			}
+			if _, err := os.Stat(legacy); !os.IsNotExist(err) {
+				t.Fatalf("legacy namespace still present: %v", err)
+			}
+		})
 	}
 }
 

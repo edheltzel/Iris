@@ -16,7 +16,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -38,12 +37,13 @@ func TestModelKindUsesEnglishOnlyForEnglish(t *testing.T) {
 }
 
 func TestSpeechCacheDirUsesStablePerUserNamespace(t *testing.T) {
-	base := t.TempDir()
-	got, err := speechCacheDir(func() (string, error) { return base, nil })
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	got, err := SpeechCacheDir()
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := filepath.Join(base, "iris", "speech", speechCacheVersion, "parakeet")
+	want := filepath.Join(home, ".agents", "Iris", "speech", speechCacheVersion, "parakeet")
 	if got != want {
 		t.Fatalf("speech cache = %q, want %q", got, want)
 	}
@@ -53,59 +53,57 @@ func TestSpeechCacheDirUsesStablePerUserNamespace(t *testing.T) {
 }
 
 func TestSpeechCacheDirMigratesLegacyContents(t *testing.T) {
-	base := t.TempDir()
-	legacy := speechCachePath(base, runtime.GOOS, "spynel")
-	if err := os.MkdirAll(legacy, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	marker := filepath.Join(legacy, "model.bin")
-	if err := os.WriteFile(marker, []byte("keep-me"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	got, err := speechCacheDir(func() (string, error) { return base, nil })
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := speechCachePath(base, runtime.GOOS, "iris")
-	if got != want {
-		t.Fatalf("speech cache = %q, want %q", got, want)
-	}
-	data, err := os.ReadFile(filepath.Join(got, "model.bin"))
-	if err != nil || string(data) != "keep-me" {
-		t.Fatalf("migrated model = %q err=%v", data, err)
-	}
-	if _, err := os.Stat(legacy); !os.IsNotExist(err) {
-		t.Fatalf("legacy cache still present: %v", err)
-	}
-}
-
-func TestSpeechCachePathUsesPlatformVariants(t *testing.T) {
-	tests := []struct {
-		name, goos, base, want string
-	}{
-		{name: "linux", goos: "linux", base: "/home/spy/.cache", want: "/home/spy/.cache/iris/speech/v1/parakeet"},
-		{name: "darwin", goos: "darwin", base: "/Users/spy/Library/Caches", want: "/Users/spy/Library/Caches/iris/speech/v1/parakeet"},
-		{name: "windows", goos: "windows", base: `C:\Users\spy\AppData\Local`, want: `C:\Users\spy\AppData\Local\iris\speech\v1\parakeet`},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if got := speechCachePath(test.base, test.goos, "iris"); got != test.want {
-				t.Fatalf("speech cache path = %q, want %q", got, test.want)
+	for _, product := range []string{"iris", "spynel"} {
+		t.Run(product, func(t *testing.T) {
+			home := t.TempDir()
+			t.Setenv("HOME", home)
+			cache, err := os.UserCacheDir()
+			if err != nil {
+				t.Fatal(err)
+			}
+			legacy := filepath.Join(cache, product, "speech", speechCacheVersion, "parakeet")
+			if err := os.MkdirAll(legacy, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			marker := filepath.Join(legacy, "model.bin")
+			if err := os.WriteFile(marker, []byte("keep-me"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			got, err := SpeechCacheDir()
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := filepath.Join(home, ".agents", "Iris", "speech", speechCacheVersion, "parakeet")
+			if got != want {
+				t.Fatalf("speech cache = %q, want %q", got, want)
+			}
+			data, err := os.ReadFile(filepath.Join(got, "model.bin"))
+			if err != nil || string(data) != "keep-me" {
+				t.Fatalf("migrated model = %q err=%v", data, err)
+			}
+			if _, err := os.Stat(legacy); !os.IsNotExist(err) {
+				t.Fatalf("legacy cache still present: %v", err)
 			}
 		})
 	}
 }
 
 func TestSpeechCacheDirReportsResolutionAndCreationFailures(t *testing.T) {
-	_, err := speechCacheDir(func() (string, error) { return "", errors.New("unavailable") })
-	if err == nil || !strings.Contains(err.Error(), "operating-system user cache") || !strings.Contains(err.Error(), "speech.model_dir") {
+	t.Setenv("HOME", "")
+	_, err := SpeechCacheDir()
+	if err == nil || !strings.Contains(err.Error(), "operating-system user home") || !strings.Contains(err.Error(), "speech.model_dir") {
 		t.Fatalf("resolution error = %v", err)
 	}
-	file := filepath.Join(t.TempDir(), "occupied")
-	if err := os.WriteFile(file, []byte("file"), 0o600); err != nil {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	root := filepath.Join(home, ".agents", "Iris", "speech", speechCacheVersion, "parakeet")
+	if err := os.MkdirAll(filepath.Dir(root), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	_, err = speechCacheDir(func() (string, error) { return file, nil })
+	if err := os.WriteFile(root, []byte("file"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err = SpeechCacheDir()
 	if err == nil || !strings.Contains(err.Error(), "create shared speech cache") || !strings.Contains(err.Error(), "permissions") {
 		t.Fatalf("creation error = %v", err)
 	}
@@ -484,6 +482,7 @@ func TestParakeetRealIntegration(t *testing.T) {
 	if audio == "" || modelDir == "" {
 		t.Skip("set SPYNEL_TEST_VOICE and SPYNEL_TEST_PARAKEET_MODEL_DIR for the real Parakeet integration test")
 	}
+	t.Setenv("HOME", t.TempDir())
 	cfg := config.Default()
 	cfg.Root = t.TempDir()
 	cfg.Speech.ModelDir = modelDir

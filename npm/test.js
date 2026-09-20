@@ -78,7 +78,7 @@ try {
 }
 assert.doesNotThrow(() => validateArchiveEntries(["./iris", "./lib/runtime.so", "licenses/miniaudio/LICENSE"]));
 assert.throws(() => validateArchiveEntries(["../../outside"]), /escapes/);
-assert.throws(() => validateArchiveEntries(["C:\\outside\\spynel.exe"]), /absolute/);
+assert.throws(() => validateArchiveEntries(["C:\\outside\\iris.exe"]), /absolute/);
 assert.throws(() => validateArchiveEntries(["safe\nunsafe"]), /control/);
 const extracted = fs.mkdtempSync(path.join(__dirname, ".test-extracted-"));
 try {
@@ -118,7 +118,7 @@ async function close(server) {
 }
 
 async function checkLauncherSignals() {
-  const directory = fs.mkdtempSync(path.join(require("os").tmpdir(), "spynel-launcher-"));
+  const directory = fs.mkdtempSync(path.join(require("os").tmpdir(), "iris-launcher-"));
   try {
     fs.mkdirSync(path.join(directory, "npm", "bin"), { recursive: true });
     fs.mkdirSync(path.join(directory, "npm", "vendor"));
@@ -160,7 +160,7 @@ setInterval(() => {}, 1000);
 }
 
 function checkLauncherUpdates() {
-  const directory = fs.mkdtempSync(path.join(require("os").tmpdir(), "spynel-update-"));
+  const directory = fs.mkdtempSync(path.join(require("os").tmpdir(), "iris-update-"));
   try {
     fs.mkdirSync(path.join(directory, "npm", "bin"), { recursive: true });
     fs.mkdirSync(path.join(directory, "npm", "vendor"));

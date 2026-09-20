@@ -94,18 +94,25 @@ func (e *Election) ID() string            { return e.id }
 func (e *Election) EnvironmentID() string { return e.environmentID }
 
 // EnvironmentID returns a non-secret digest of a private random token stored
-// in the operating system's per-user configuration directory. This models the
-// supported loopback-connectivity boundary: ordinary processes for one local
-// installation share it, while a host and its containers (and normally two
-// containers) use different configuration homes. It deliberately does not use
-// hostnames, paths, MAC addresses, machine IDs, boot IDs, or Linux namespace
-// inode values.
+// under $HOME/.agents/Iris. This models the supported loopback-connectivity
+// boundary: ordinary processes for one local installation share it, while a
+// host and its containers (and normally two containers) use different homes.
+// It deliberately does not use hostnames, paths, MAC addresses, machine IDs,
+// boot IDs, or Linux namespace inode values.
 func EnvironmentID() (string, error) {
-	directory, err := os.UserConfigDir()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("locate environment identity directory: %w", err)
 	}
-	path := filepath.Join(adoptUserNamespace(directory), "environment-token")
+	root := filepath.Join(home, ".agents", "Iris")
+	var sources []string
+	if directory, err := os.UserConfigDir(); err == nil {
+		sources = []string{filepath.Join(directory, "iris"), filepath.Join(directory, "spynel")}
+	}
+	if err := migrateInto(root, sources...); err != nil {
+		return "", fmt.Errorf("migrate environment identity directory: %w", err)
+	}
+	path := filepath.Join(root, "environment-token")
 	token, err := readEnvironmentToken(path)
 	if errors.Is(err, os.ErrNotExist) {
 		data := make([]byte, environmentTokenBytes)
@@ -147,18 +154,42 @@ func readEnvironmentToken(path string) (string, error) {
 	return token, nil
 }
 
-func adoptUserNamespace(parent string) string {
-	next := filepath.Join(parent, "iris")
-	prev := filepath.Join(parent, "spynel")
-	if _, err := os.Lstat(next); err == nil {
-		return next
+func migrateInto(dest string, sources ...string) error {
+	if err := os.MkdirAll(filepath.Dir(dest), 0o700); err != nil {
+		return err
 	}
-	if info, err := os.Lstat(prev); err == nil && info.IsDir() {
-		if err := os.Rename(prev, next); err == nil {
-			return next
+	if _, err := os.Lstat(dest); err == nil {
+		return nil
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	for _, src := range sources {
+		info, err := os.Lstat(src)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return err
 		}
+		if !info.IsDir() {
+			continue
+		}
+		err = os.Rename(src, dest)
+		if err == nil {
+			return nil
+		}
+		if _, destErr := os.Lstat(dest); destErr == nil {
+			return nil
+		}
+		if os.IsNotExist(err) {
+			if _, destErr := os.Lstat(dest); destErr == nil {
+				return nil
+			}
+			continue
+		}
+		return err
 	}
-	return next
+	return nil
 }
 
 func validEnvironmentID(value string) bool {

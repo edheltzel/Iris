@@ -53,7 +53,7 @@ func runUninstallBundles(args []string) error {
 		if !filepath.IsAbs(modules) || strings.ContainsAny(modules, "\r\n") {
 			return errors.New("npm returned an invalid global package directory")
 		}
-		*npmRoot = filepath.Join(modules, "spynel")
+		*npmRoot = filepath.Join(modules, "@edheltzel", "iris")
 	}
 	if *npmRoot != "" {
 		if !filepath.IsAbs(*npmRoot) {
@@ -72,7 +72,7 @@ func runUninstallBundles(args []string) error {
 				if err != nil {
 					return err
 				}
-				fmt.Fprintln(os.Stderr, "Administrator access is required to uninstall Spynel.")
+				fmt.Fprintln(os.Stderr, "Administrator access is required to uninstall Iris.")
 				command := exec.CommandContext(ctx, "sudo", "--", "env", "HOME="+home, "PATH="+os.Getenv("PATH"), executable, "uninstall-bundles", "--root", *root, "--npm-root", *npmRoot, "--user-id", strconv.Itoa(*userID))
 				command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
 				return command.Run()
@@ -85,17 +85,17 @@ func runUninstallBundles(args []string) error {
 			if err != nil {
 				return err
 			}
-			manager.Executable = filepath.Join(installation.InstallRoot, "spynel")
+			manager.Executable = filepath.Join(installation.InstallRoot, "iris")
 			manager.NPMLauncher = ""
 			if installation.PackageRoot != "" {
-				manager.Executable = filepath.Join(installation.PackageRoot, "npm", "vendor", "spynel")
-				manager.NPMLauncher = filepath.Join(installation.PackageRoot, "npm", "bin", "spynel.js")
+				manager.Executable = filepath.Join(installation.PackageRoot, "npm", "vendor", "iris")
+				manager.NPMLauncher = filepath.Join(installation.PackageRoot, "npm", "bin", "iris.js")
 			}
 			return manager.RemoveInstallation(ctx, *userID)
 		}); err != nil {
 			return err
 		}
 	}
-	fmt.Fprintln(os.Stdout, "Spynel uninstalled.")
+	fmt.Fprintln(os.Stdout, "Iris uninstalled.")
 	return nil
 }

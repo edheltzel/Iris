@@ -394,8 +394,8 @@ func TestWorkflowListAliasPreservesSharedAndListOptions(t *testing.T) {
 
 func TestWorkflowListAliasesAreDocumentedForExternalPrograms(t *testing.T) {
 	for _, want := range []string{
-		"spynel tasks [flags] [VIEW]",
-		"spynel goals [flags] [VIEW]",
+		"iris tasks [flags] [VIEW]",
+		"iris goals [flags] [VIEW]",
 		"open|recent|active|review|waiting|done|failed|all",
 		"--config PATH",
 		"--conversation NAME",
@@ -762,7 +762,7 @@ func TestOfflineUpdateInstallReturnsControlToNPMLauncher(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(packageRoot, "npm", "vendor"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(packageRoot, "package.json"), []byte(`{"name":"spynel","version":"1.2.0"}`), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(packageRoot, "package.json"), []byte(`{"name":"@edheltzel/iris","version":"1.2.0"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(packageRoot, "npm", "vendor", ".installed.json"), []byte(`{"version":"1.2.0"}`), 0o600); err != nil {
@@ -772,11 +772,11 @@ func TestOfflineUpdateInstallReturnsControlToNPMLauncher(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Link(executable, filepath.Join(packageRoot, "npm", "vendor", "spynel")); err != nil {
+	if err := os.Link(executable, filepath.Join(packageRoot, "npm", "vendor", "iris")); err != nil {
 		t.Fatal(err)
 	}
 	registry := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
-		_, _ = writer.Write([]byte(`{"name":"spynel","version":"1.3.0"}`))
+		_, _ = writer.Write([]byte(`{"name":"@edheltzel/iris","version":"1.3.0"}`))
 	}))
 	defer registry.Close()
 	t.Setenv("SPYNEL_NPM_PACKAGE_ROOT", packageRoot)
@@ -826,13 +826,13 @@ func TestInitNoStartCreatesWorkspaceWithoutEnteringTUI(t *testing.T) {
 }
 
 func TestSendCommandValidatesScriptableArguments(t *testing.T) {
-	if err := run([]string{"send"}, "test"); err == nil || !strings.Contains(err.Error(), "usage: spynel send") {
+	if err := run([]string{"send"}, "test"); err == nil || !strings.Contains(err.Error(), "usage: iris send") {
 		t.Fatalf("missing send text error = %v", err)
 	}
 	if err := run([]string{"send", "--conversation", "", "hello"}, "test"); err == nil || !strings.Contains(err.Error(), "cannot be empty") {
 		t.Fatalf("empty conversation error = %v", err)
 	}
-	if !strings.Contains(helpText, "spynel send") || !strings.Contains(helpText, "--conversation") {
+	if !strings.Contains(helpText, "iris send") || !strings.Contains(helpText, "--conversation") {
 		t.Fatalf("send command is not documented in CLI help:\n%s", helpText)
 	}
 }
@@ -1426,7 +1426,7 @@ func TestStartupConnectionStatusIsVisibleBoundedAndOptional(t *testing.T) {
 	status := newStartupConnectionStatus(&output, true)
 	status.connecting()
 	status.connected()
-	want := "Connecting to the existing Spynel primary…\nConnected to the existing Spynel primary.\n"
+	want := "Connecting to the existing Iris primary…\nConnected to the existing Iris primary.\n"
 	if output.String() != want {
 		t.Fatalf("successful startup status = %q", output.String())
 	}

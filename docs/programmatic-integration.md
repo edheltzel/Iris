@@ -11,7 +11,7 @@ Use a locally built binary (`scripts/dev.sh build`) for final testing. Substitut
 your **test workspace** below; this does not replace an installed binary.
 
 ```sh
-BIN=/absolute/path/to/spynel/.tmp-bin/spynel
+BIN=/absolute/path/to/iris/.tmp-bin/iris
 WORK=/absolute/path/to/test-workspace
 "$BIN" init --no-start --dir "$WORK"
 "$BIN" serve --config "$WORK/.spynel/config.yaml"

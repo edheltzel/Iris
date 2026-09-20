@@ -1,4 +1,4 @@
-name: Release Spynel
+name: Release Iris
 
 on:
   release:
@@ -97,6 +97,7 @@ jobs:
           TARGET_ARCH: ${{ matrix.arch }}
         run: |
           mkdir -p .tmp-artifacts/standalone-prior
+          # Prior-generation fixture only: v0.12.1 agent0ai/spynel archives.
           archive="spynel_0.12.1_${TARGET_OS}_${TARGET_ARCH}.tar.gz"
           curl -LfS --retry 3 -o ".tmp-artifacts/standalone-prior/$archive" "https://github.com/agent0ai/spynel/releases/download/v0.12.1/$archive"
           curl -LfS --retry 3 -o .tmp-artifacts/standalone-prior/checksums.txt https://github.com/agent0ai/spynel/releases/download/v0.12.1/checksums.txt
@@ -124,14 +125,14 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: spynel-archive-${{ matrix.os }}-${{ matrix.arch }}
+          name: iris-archive-${{ matrix.os }}-${{ matrix.arch }}
           path: release/*
           if-no-files-found: error
 
       - name: Retain native compatibility evidence
         uses: actions/upload-artifact@v4
         with:
-          name: spynel-evidence-${{ matrix.os }}-${{ matrix.arch }}
+          name: iris-evidence-${{ matrix.os }}-${{ matrix.arch }}
           path: evidence/native-${{ matrix.os }}-${{ matrix.arch }}.json
           if-no-files-found: error
 
@@ -149,12 +150,12 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          pattern: spynel-archive-*
+          pattern: iris-archive-*
           path: release
           merge-multiple: true
 
       - name: Create release checksums
-        run: (cd release && sha256sum spynel_* > checksums.txt)
+        run: (cd release && sha256sum iris_* > checksums.txt)
 
       - name: Attach native archives and checksums to the GitHub release
         env:
