@@ -130,7 +130,7 @@ Beyond routing, captain locked these build-time seats (not a live chat loop). **
 | 2 | Wait / land triage | Classify ready, stalled, or needs human |
 | 3 | Notify gate | Atlas vs optional side channel vs stay quiet |
 
-GitHub track (Iris issues disabled): [Sentinel#50](https://github.com/edheltzel/Sentinel/issues/50).
+GitHub track: [Iris#4](https://github.com/edheltzel/Iris/issues/4) (moved from [Sentinel#50](https://github.com/edheltzel/Sentinel/issues/50)).
 
 ---
 
