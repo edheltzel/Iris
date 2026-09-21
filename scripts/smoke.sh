@@ -7,12 +7,17 @@ binary="$project_dir/.tmp-bin/iris"
 
 "$script_dir/dev.sh" dox
 "$script_dir/dev.sh" build >/dev/null
+# Host Go caches, captured before HOME isolation. Defaults write 0444 modules under $HOME/go.
+gopath=$(go env GOPATH)
+gocache=$(go env GOCACHE)
+gomodcache=$(go env GOMODCACHE)
 smoke_dir=$(mktemp -d "${TMPDIR:-/tmp}/iris-smoke.XXXXXX")
-trap 'rm -rf "$smoke_dir"' EXIT HUP INT TERM
+trap 'chmod -R u+w "$smoke_dir" && rm -rf "$smoke_dir"' EXIT HUP INT TERM
 HOME="$smoke_dir/home"
 XDG_CONFIG_HOME="$HOME/.config"
 XDG_CACHE_HOME="$HOME/.cache"
 export HOME XDG_CONFIG_HOME XDG_CACHE_HOME
+export GOPATH="$gopath" GOCACHE="$gocache" GOMODCACHE="$gomodcache"
 mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME"
 
 dev_bin_dir="$smoke_dir/user bin"
@@ -116,4 +121,5 @@ for status in proposed planning active review reviewing waiting done abandoned; 
   test -d "$smoke_dir/.spynel/goals/$status"
 done
 
+test ! -e "$HOME/go"
 echo "Spynel smoke test passed: $smoke_dir"
