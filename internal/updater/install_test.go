@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -23,7 +24,7 @@ import (
 func candidateArchive(t *testing.T, version string, mutate func(map[string]string), extra *tar.Header) (string, string) {
 	t.Helper()
 	files := map[string]string{
-		"spynel":  "#!/bin/sh\nprintf 'spynel " + version + "\\n'\n",
+		"iris":    "#!/bin/sh\nprintf 'iris " + version + "\\n'\n",
 		"LICENSE": "license", "THIRD_PARTY_NOTICES.md": "notices",
 	}
 	for _, name := range []string{"sherpa-onnx", "onnxruntime", "miniaudio", "pion-opus", "bubbletea", "bubbles-textarea"} {
@@ -84,7 +85,7 @@ func TestInstallRetainsWorkingBundleAndRejectsInvalidCandidates(t *testing.T) {
 	root := filepath.Join(parent, "installation with spaces Ω")
 	ctx := context.Background()
 	archive, sums := candidateArchive(t, "1.2.0", nil, nil)
-	launcher, err := InstallArchive(ctx, root, archive, sums, "1.2.0")
+	launcher, err := InstallArchive(ctx, root, archive, sums, "1.2.0", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,12 +121,12 @@ func TestInstallRetainsWorkingBundleAndRejectsInvalidCandidates(t *testing.T) {
 				}
 			}
 		}},
-		{name: "wrong version", mutate: func(files map[string]string) { files["spynel"] = "#!/bin/sh\necho spynel 7.0.0\n" }},
+		{name: "wrong version", mutate: func(files map[string]string) { files["iris"] = "#!/bin/sh\necho iris 7.0.0\n" }},
 		{name: "traversal", header: &tar.Header{Name: "../escape", Typeflag: tar.TypeReg}},
 		{name: "absolute", header: &tar.Header{Name: "/escape", Typeflag: tar.TypeReg}},
 		{name: "symlink", header: &tar.Header{Name: "link", Typeflag: tar.TypeSymlink, Linkname: "/tmp"}},
-		{name: "hardlink", header: &tar.Header{Name: "link", Typeflag: tar.TypeLink, Linkname: "./spynel"}},
-		{name: "duplicate", header: &tar.Header{Name: "./spynel", Typeflag: tar.TypeReg}},
+		{name: "hardlink", header: &tar.Header{Name: "link", Typeflag: tar.TypeLink, Linkname: "./iris"}},
+		{name: "duplicate", header: &tar.Header{Name: "./iris", Typeflag: tar.TypeReg}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -135,7 +136,7 @@ func TestInstallRetainsWorkingBundleAndRejectsInvalidCandidates(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if _, err := InstallArchive(ctx, root, archive, sums, "1.3.0"); err == nil {
+			if _, err := InstallArchive(ctx, root, archive, sums, "1.3.0", nil); err == nil {
 				t.Fatal("accepted invalid candidate")
 			}
 			current, _ := filepath.EvalSymlinks(launcher)
@@ -151,7 +152,7 @@ func TestInstallRetainsWorkingBundleAndRejectsInvalidCandidates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := InstallArchive(ctx, root, archive, sums, "1.2.0"); err == nil {
+	if _, err := InstallArchive(ctx, root, archive, sums, "1.2.0", nil); err == nil {
 		t.Fatal("overlapping installation acquired lock")
 	}
 	unlock()
@@ -160,7 +161,7 @@ func TestInstallRetainsWorkingBundleAndRejectsInvalidCandidates(t *testing.T) {
 		t.Fatal(err)
 	}
 	archive, sums = candidateArchive(t, "1.3.0", nil, nil)
-	if _, err := InstallArchive(ctx, root, archive, sums, "1.3.0"); err != nil {
+	if _, err := InstallArchive(ctx, root, archive, sums, "1.3.0", nil); err != nil {
 		t.Fatal(err)
 	}
 	current, _ := filepath.EvalSymlinks(launcher)
@@ -186,15 +187,119 @@ func TestInstallRetainsWorkingBundleAndRejectsInvalidCandidates(t *testing.T) {
 		t.Fatal("ownership lost after update")
 	}
 	archive, sums = candidateArchive(t, "1.2.0", nil, nil)
-	if _, err := InstallArchive(ctx, root, archive, sums, "1.2.0"); err == nil {
+	if _, err := InstallArchive(ctx, root, archive, sums, "1.2.0", nil); err == nil {
 		t.Fatal("allowed downgrade")
 	}
 	unmanaged := t.TempDir()
 	if err := os.WriteFile(filepath.Join(unmanaged, "unrelated"), []byte("keep"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := InstallArchive(ctx, unmanaged, archive, sums, "1.2.0"); err == nil {
+	if _, err := InstallArchive(ctx, unmanaged, archive, sums, "1.2.0", nil); err == nil {
 		t.Fatal("adopted unmanaged directory")
+	}
+}
+
+func TestInstallReplacesOwnedLegacyLauncher(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("standalone distribution excludes Windows")
+	}
+	root := filepath.Join(t.TempDir(), "installation")
+	legacyBundle := filepath.Join(root, "releases", "0.12.1-legacy")
+	if err := os.MkdirAll(legacyBundle, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	marker, err := json.Marshal(bundleMetadata{Version: "0.12.1", OS: runtime.GOOS, Arch: runtime.GOARCH})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, data := range map[string][]byte{
+		filepath.Join(root, ".spynel-install"):      []byte(ownershipMarker),
+		filepath.Join(legacyBundle, ".bundle.json"): append(marker, '\n'),
+		filepath.Join(legacyBundle, "spynel"):       []byte("legacy"),
+	} {
+		if err := os.WriteFile(path, data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(filepath.Join("releases", filepath.Base(legacyBundle)), filepath.Join(root, "current")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("current/spynel", filepath.Join(root, "spynel")); err != nil {
+		t.Fatal(err)
+	}
+	archive, sums := candidateArchive(t, "1.2.0", nil, nil)
+	migrationFailure := errors.New("startup migration failed")
+	if _, err := InstallArchive(context.Background(), root, archive, sums, "1.2.0", func(context.Context, string, string) error {
+		return migrationFailure
+	}); !errors.Is(err, migrationFailure) {
+		t.Fatalf("migration failure = %v", err)
+	}
+	if target, err := os.Readlink(filepath.Join(root, "current")); err != nil || target != filepath.Join("releases", filepath.Base(legacyBundle)) {
+		t.Fatalf("current after migration failure = %q, %v", target, err)
+	}
+	if _, err := os.Lstat(filepath.Join(root, "spynel")); err != nil {
+		t.Fatal("legacy launcher lost after migration failure:", err)
+	}
+	if _, err := os.Lstat(filepath.Join(root, "iris")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("Iris launcher published after migration failure: %v", err)
+	}
+	originalRemove := removeLegacyLauncher
+	removalFailure := errors.New("legacy launcher removal failed")
+	removeLegacyLauncher = func(path string) error {
+		if path == filepath.Join(root, "spynel") {
+			return removalFailure
+		}
+		return originalRemove(path)
+	}
+	t.Cleanup(func() { removeLegacyLauncher = originalRemove })
+	reversalFailure := errors.New("startup migration reversal failed")
+	migrationCalls := 0
+	_, err = InstallArchive(context.Background(), root, archive, sums, "1.2.0", func(_ context.Context, from, to string) error {
+		migrationCalls++
+		if migrationCalls == 1 {
+			if from != filepath.Join(root, "spynel") || to != filepath.Join(root, "iris") {
+				t.Fatalf("startup migration = %q -> %q", from, to)
+			}
+			return nil
+		}
+		if from != filepath.Join(root, "iris") || to != filepath.Join(root, "spynel") {
+			t.Fatalf("startup reversal = %q -> %q", from, to)
+		}
+		return reversalFailure
+	})
+	if !errors.Is(err, removalFailure) || !errors.Is(err, reversalFailure) ||
+		!strings.Contains(err.Error(), "remove legacy launcher") || !strings.Contains(err.Error(), "reverse startup migration") {
+		t.Fatalf("mixed migration failure = %v", err)
+	}
+	if target, err := os.Readlink(filepath.Join(root, "current")); err != nil || target != filepath.Join("releases", filepath.Base(legacyBundle)) {
+		t.Fatalf("current after mixed migration failure = %q, %v", target, err)
+	}
+	if _, err := os.Lstat(filepath.Join(root, "spynel")); err != nil {
+		t.Fatal("legacy launcher lost after mixed migration failure:", err)
+	}
+	if _, err := os.Lstat(filepath.Join(root, "iris")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("Iris launcher published after mixed migration failure: %v", err)
+	}
+	removeLegacyLauncher = originalRemove
+	migrated := false
+	launcher, err := InstallArchive(context.Background(), root, archive, sums, "1.2.0", func(_ context.Context, from, to string) error {
+		if from != filepath.Join(root, "spynel") || to != filepath.Join(root, "iris") {
+			t.Fatalf("startup migration = %q -> %q", from, to)
+		}
+		migrated = true
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !migrated {
+		t.Fatal("startup registration migration was skipped")
+	}
+	if _, err := os.Lstat(filepath.Join(root, "spynel")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("legacy launcher remains: %v", err)
+	}
+	if output, err := exec.Command(launcher, "--version").CombinedOutput(); err != nil || strings.TrimSpace(string(output)) != "iris 1.2.0" {
+		t.Fatalf("Iris launcher output = %q, err = %v", output, err)
 	}
 }
 
@@ -204,7 +309,7 @@ func TestGitHubDiscoveryAndDownloadFailures(t *testing.T) {
 	}
 	archive, sums := candidateArchive(t, "1.2.0", nil, nil)
 	root := filepath.Join(t.TempDir(), "install")
-	if _, err := InstallArchive(context.Background(), root, archive, sums, "1.2.0"); err != nil {
+	if _, err := InstallArchive(context.Background(), root, archive, sums, "1.2.0", nil); err != nil {
 		t.Fatal(err)
 	}
 	next, nextSums := candidateArchive(t, "1.3.0", nil, nil)
@@ -264,7 +369,7 @@ func TestNPMEnvironmentCannotClaimUnrelatedExecutable(t *testing.T) {
 	}
 	_ = os.WriteFile(filepath.Join(root, "package.json"), []byte(`{"name":"spynel","version":"1.2.0"}`), 0600)
 	_ = os.WriteFile(filepath.Join(root, "npm", "vendor", ".installed.json"), []byte(`{"version":"1.2.0"}`), 0600)
-	_ = os.WriteFile(filepath.Join(root, "npm", "vendor", "spynel"), []byte("unrelated"), 0700)
+	_ = os.WriteFile(filepath.Join(root, "npm", "vendor", "iris"), []byte("unrelated"), 0700)
 	t.Setenv("SPYNEL_NPM_PACKAGE_ROOT", root)
 	t.Setenv("SPYNEL_NPM_LAUNCHER_MANAGED", "1")
 	if got := Detect("1.2.0"); got.PackageRoot != "" {

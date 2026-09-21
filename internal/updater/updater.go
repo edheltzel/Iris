@@ -16,7 +16,7 @@ import (
 
 const (
 	DefaultCheckTimeout = 10 * time.Second
-	defaultRegistryURL  = "https://registry.npmjs.org/spynel/latest"
+	defaultRegistryURL  = "https://registry.npmjs.org/@edheltzel/iris/latest"
 	maxRegistryResponse = 64 * 1024
 	periodicChecksEnv   = "SPYNEL_NPM_PERIODIC_UPDATE_CHECKS"
 	checkedAtEnv        = "SPYNEL_NPM_UPDATE_CHECKED_AT"
@@ -79,16 +79,17 @@ func (m *Manager) InitialAvailability() (available bool, checkedAt time.Time, ok
 
 // Manager owns source-specific release discovery and installation.
 type Manager struct {
-	CurrentVersion     string
-	InstallRoot        string
-	GitHubURL          string
-	PackageRoot        string
-	LauncherManaged    bool
-	CoordinatedUpdates bool
-	PeriodicChecks     bool
-	RegistryURL        string
-	CheckTimeout       time.Duration
-	Client             *http.Client
+	CurrentVersion       string
+	InstallRoot          string
+	GitHubURL            string
+	PackageRoot          string
+	LauncherManaged      bool
+	CoordinatedUpdates   bool
+	PeriodicChecks       bool
+	RegistryURL          string
+	CheckTimeout         time.Duration
+	Client               *http.Client
+	MigrateLegacyStartup func(context.Context, string, string) error
 }
 
 type packageMetadata struct {
@@ -138,7 +139,7 @@ func Detect(currentVersion string) *Manager {
 	if root == "" {
 		root = launcherRoot
 	}
-	if validNPMRoot(root, currentVersion) && sameFile(executable, filepath.Join(root, "npm", "vendor", "spynel")) {
+	if validNPMRoot(root, currentVersion) && sameFile(executable, filepath.Join(root, "npm", "vendor", "iris")) {
 		manager.PackageRoot = root
 		manager.LauncherManaged = os.Getenv("SPYNEL_NPM_LAUNCHER_MANAGED") == "1" && sameFile(root, launcherRoot)
 		manager.CoordinatedUpdates = manager.LauncherManaged && os.Getenv("SPYNEL_NPM_COORDINATED_UPDATES") == "1"
@@ -165,6 +166,10 @@ func npmRootFromExecutable(executable string) string {
 }
 
 func validNPMRoot(root, currentVersion string) bool {
+	return validNPMRootPackage(root, currentVersion, "@edheltzel/iris")
+}
+
+func validNPMRootPackage(root, currentVersion, packageName string) bool {
 	if root == "" {
 		return false
 	}
@@ -173,7 +178,7 @@ func validNPMRoot(root, currentVersion string) bool {
 		return false
 	}
 	var metadata packageMetadata
-	if json.Unmarshal(data, &metadata) != nil || metadata.Name != "spynel" {
+	if json.Unmarshal(data, &metadata) != nil || metadata.Name != packageName {
 		return false
 	}
 	markerData, err := os.ReadFile(filepath.Join(root, "npm", "vendor", ".installed.json"))
@@ -193,7 +198,7 @@ func (m *Manager) Check(ctx context.Context) (Result, error) {
 		InstalledViaNPM: m != nil && m.PackageRoot != "",
 		Current:         "",
 		CanAutoInstall:  m != nil && m.PackageRoot != "" && m.LauncherManaged,
-		Command:         "npm update --global spynel",
+		Command:         "npm update --global @edheltzel/iris",
 	}
 	if m == nil {
 		return result, nil

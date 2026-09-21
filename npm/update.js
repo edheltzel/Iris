@@ -10,7 +10,7 @@ const pkg = require("../package.json");
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const STARTUP_PROMPT_TIMEOUT_MS = 10_000;
-const DEFAULT_REGISTRY_URL = "https://registry.npmjs.org/spynel/latest";
+const DEFAULT_REGISTRY_URL = "https://registry.npmjs.org/@edheltzel/iris/latest";
 const MAX_RESPONSE_BYTES = 64 * 1024;
 
 function parseVersion(value) {
@@ -57,7 +57,7 @@ function requestJSON(url, timeoutMs, redirects = 0, deadline = Date.now() + time
     const request = transport.get(parsed, {
       headers: {
         Accept: "application/json",
-        "User-Agent": `spynel/${pkg.version}`
+        "User-Agent": `iris/${pkg.version}`
       }
     }, response => {
       if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
@@ -138,7 +138,8 @@ function npmInvocation(packageRoot = path.resolve(__dirname, "..")) {
   if (globalRoot && samePath(packageRoot, path.join(globalRoot, pkg.name))) {
     return { command: npm, args: ["update", "--global", pkg.name], display: `npm update --global ${pkg.name}` };
   }
-  const nodeModules = path.dirname(packageRoot);
+  const packageParent = path.dirname(packageRoot);
+  const nodeModules = path.basename(packageParent).startsWith("@") ? path.dirname(packageParent) : packageParent;
   const prefix = path.basename(nodeModules) === "node_modules" ? path.dirname(nodeModules) : process.cwd();
   return { command: npm, args: ["update", pkg.name, "--prefix", prefix], display: `npm update ${pkg.name}` };
 }

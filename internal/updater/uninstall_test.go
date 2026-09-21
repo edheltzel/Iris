@@ -21,13 +21,13 @@ func init() {
 		return
 	}
 	root := os.Getenv("SPYNEL_TEST_NPM_ROOT")
-	want := []string{"uninstall", "--global", "--prefix", filepath.Dir(filepath.Dir(filepath.Dir(root))), "spynel"}
+	want := []string{"uninstall", "--global", "--prefix", filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(root)))), "@edheltzel/iris"}
 	if strings.Join(os.Args[1:], "\x00") != strings.Join(want, "\x00") {
 		fmt.Fprintln(os.Stderr, "unexpected npm uninstall arguments")
 		os.Exit(1)
 	}
 	if pid, _ := strconv.Atoi(os.Getenv("SPYNEL_TEST_NPM_PID")); pid > 0 {
-		if path, err := installationProcessPath(pid); err == nil && path == filepath.Join(root, "npm", "vendor", "spynel") {
+		if path, err := installationProcessPath(pid); err == nil && path == filepath.Join(root, "npm", "vendor", "iris") {
 			os.Exit(2)
 		}
 	}
@@ -97,9 +97,10 @@ func TestUninstallStopsOnlyOwnedProcessesAndPreservesWorkspace(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, ".spynel-install"), []byte(ownershipMarker), 0600); err != nil {
 		t.Fatal(err)
 	}
-	first := uninstallFixtureProcess(t, filepath.Join(root, "releases", "first", "spynel"), "term")
-	second := uninstallFixtureProcess(t, filepath.Join(root, "releases", "second", "spynel"), "ignore-term")
-	unrelated := uninstallFixtureProcess(t, filepath.Join(t.TempDir(), "spynel"), "term")
+	first := uninstallFixtureProcess(t, filepath.Join(root, "releases", "first", "iris"), "term")
+	second := uninstallFixtureProcess(t, filepath.Join(root, "releases", "second", "iris"), "ignore-term")
+	legacy := uninstallFixtureProcess(t, filepath.Join(root, "releases", "legacy", "spynel"), "term")
+	unrelated := uninstallFixtureProcess(t, filepath.Join(t.TempDir(), "iris"), "term")
 	workspace := filepath.Join(root, ".spynel")
 	if err := os.Mkdir(workspace, 0700); err != nil {
 		t.Fatal(err)
@@ -111,10 +112,31 @@ func TestUninstallStopsOnlyOwnedProcessesAndPreservesWorkspace(t *testing.T) {
 	if err := os.MkdirAll(bin, 0700); err != nil {
 		t.Fatal(err)
 	}
-	launcher := filepath.Join(bin, "spynel")
-	if err := os.Symlink(filepath.Join(root, "spynel"), launcher); err != nil {
+	launcher := filepath.Join(bin, "iris")
+	if err := os.Symlink(filepath.Join(root, "iris"), launcher); err != nil {
 		t.Fatal(err)
 	}
+	legacyLauncher := filepath.Join(bin, "spynel")
+	if err := os.Symlink(filepath.Join(root, "spynel"), legacyLauncher); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join("current", "spynel"), filepath.Join(root, "spynel")); err != nil {
+		t.Fatal(err)
+	}
+	recordedBin := t.TempDir()
+	recordedLegacyLauncher := filepath.Join(recordedBin, "spynel")
+	if err := os.Symlink(filepath.Join(root, "spynel"), recordedLegacyLauncher); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".bin-dir"), []byte(recordedBin+"\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	unmanagedBin := t.TempDir()
+	unmanagedLauncher := filepath.Join(unmanagedBin, "spynel")
+	if err := os.Symlink(filepath.Join(t.TempDir(), "spynel"), unmanagedLauncher); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", unmanagedBin+string(os.PathListSeparator)+bin)
 	manager := &Manager{InstallRoot: root}
 	removedStartup := false
 	err = manager.Uninstall(t.Context(), func() error {
@@ -130,7 +152,7 @@ func TestUninstallStopsOnlyOwnedProcessesAndPreservesWorkspace(t *testing.T) {
 	if !removedStartup {
 		t.Fatal("startup cleanup was skipped")
 	}
-	for _, command := range []*exec.Cmd{first, second} {
+	for _, command := range []*exec.Cmd{first, second, legacy} {
 		if path, err := installationProcessPath(command.Process.Pid); err == nil && manager.ownsProcessPath(root, path) {
 			t.Fatal("uninstalled process is still running")
 		}
@@ -138,8 +160,13 @@ func TestUninstallStopsOnlyOwnedProcessesAndPreservesWorkspace(t *testing.T) {
 	if err := unrelated.Process.Signal(syscall.Signal(0)); err != nil {
 		t.Fatal("unrelated process was stopped")
 	}
-	if _, err := os.Lstat(launcher); !errors.Is(err, os.ErrNotExist) {
-		t.Fatal("owned launcher remains")
+	for _, path := range []string{launcher, legacyLauncher, recordedLegacyLauncher, filepath.Join(root, "spynel")} {
+		if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("owned launcher remains: %s", path)
+		}
+	}
+	if _, err := os.Lstat(unmanagedLauncher); err != nil {
+		t.Fatal("unmanaged launcher was removed")
 	}
 	data, err := os.ReadFile(filepath.Join(workspace, "config.yaml"))
 	if err != nil || string(data) != "keep workspace data\n" {
@@ -183,10 +210,10 @@ func TestUninstallNPMStopsBinaryBeforePackageRemoval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	root := filepath.Join(prefix, "lib", "node_modules", "spynel")
-	process := uninstallFixtureProcess(t, filepath.Join(root, "npm", "vendor", "spynel"), "term")
+	root := filepath.Join(prefix, "lib", "node_modules", "@edheltzel/iris")
+	process := uninstallFixtureProcess(t, filepath.Join(root, "npm", "vendor", "iris"), "term")
 	for name, value := range map[string]any{
-		"package.json": map[string]string{"name": "spynel", "version": "0.12.2"},
+		"package.json": map[string]string{"name": "@edheltzel/iris", "version": "0.12.2"},
 	} {
 		data, _ := json.Marshal(value)
 		if err := os.WriteFile(filepath.Join(root, name), data, 0600); err != nil {
@@ -209,5 +236,63 @@ func TestUninstallNPMStopsBinaryBeforePackageRemoval(t *testing.T) {
 	}
 	if path, err := installationProcessPath(process.Process.Pid); err == nil && manager.ownsProcessPath(root, path) {
 		t.Fatal("npm process remains: " + strconv.Itoa(process.Process.Pid))
+	}
+}
+
+func TestStopLegacyNPMWithoutRuntimeMarker(t *testing.T) {
+	prefix, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(prefix, "lib", "node_modules", "spynel")
+	legacy := uninstallFixtureProcess(t, filepath.Join(root, "npm", "vendor", "spynel"), "term")
+	unrelated := uninstallFixtureProcess(t, filepath.Join(t.TempDir(), "npm", "vendor", "spynel"), "term")
+	metadata, _ := json.Marshal(map[string]any{
+		"name":       "spynel",
+		"version":    "0.12.2",
+		"repository": map[string]string{"url": "git+https://github.com/agent0ai/spynel.git"},
+		"bin":        map[string]string{"spynel": "npm/bin/spynel.js"},
+	})
+	if err := os.WriteFile(filepath.Join(root, "package.json"), metadata, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manager := &Manager{PackageRoot: root}
+	removedStartup := false
+	if err := manager.StopLegacyNPM(t.Context(), func(cleanRoot string) error {
+		if cleanRoot != root {
+			t.Fatalf("cleanup root = %q, want %q", cleanRoot, root)
+		}
+		removedStartup = true
+		if err := legacy.Process.Signal(syscall.Signal(0)); err != nil {
+			t.Fatal("legacy process stopped before its startup registration")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !removedStartup {
+		t.Fatal("startup cleanup was skipped")
+	}
+	if path, err := installationProcessPath(legacy.Process.Pid); err == nil && manager.ownsProcessPath(root, path) {
+		t.Fatal("legacy npm process remains")
+	}
+	if err := unrelated.Process.Signal(syscall.Signal(0)); err != nil {
+		t.Fatal("unrelated process was stopped")
+	}
+	if _, err := os.Stat(filepath.Join(root, "package.json")); err != nil {
+		t.Fatal("legacy npm package was removed")
+	}
+	metadata, _ = json.Marshal(map[string]any{
+		"name":       "spynel",
+		"version":    "0.12.2",
+		"repository": map[string]string{"url": "https://example.com/unrelated.git"},
+		"bin":        map[string]string{"spynel": "npm/bin/spynel.js"},
+	})
+	if err := os.WriteFile(filepath.Join(root, "package.json"), metadata, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	called := false
+	if err := manager.StopLegacyNPM(t.Context(), func(string) error { called = true; return nil }); err == nil || called {
+		t.Fatal("unrelated npm package entered lifecycle cleanup")
 	}
 }

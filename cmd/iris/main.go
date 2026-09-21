@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/agent0ai/spynel/internal/cli"
+	"github.com/edheltzel/iris/internal/cli"
 )
 
 var version = "dev"
@@ -14,7 +14,7 @@ func main() {
 		if exit, ok := err.(interface{ ExitCode() int }); ok {
 			os.Exit(exit.ExitCode())
 		}
-		fmt.Fprintln(os.Stderr, "spynel:", err)
+		fmt.Fprintln(os.Stderr, "iris:", err)
 		os.Exit(1)
 	}
 }

@@ -7,7 +7,7 @@ usage() {
   cat <<'EOF'
 Usage: scripts/install-dev.sh [--bin-dir DIRECTORY]
 
-Build Spynel for development and install it as spynel in a user bin directory.
+Build Spynel for development and install it as iris in a user bin directory.
 The default is $SPYNEL_DEV_BIN_DIR when set, otherwise $HOME/.local/bin.
 EOF
 }
@@ -56,7 +56,7 @@ esac
 
 mkdir -p "$bin_dir"
 bin_dir=$(CDPATH= cd -- "$bin_dir" && pwd)
-target="$bin_dir/spynel"
+target="$bin_dir/iris"
 if [ -e "$target" ] && [ ! -f "$target" ] && [ ! -L "$target" ]; then
   echo "refusing to replace non-file target: $target" >&2
   exit 1
@@ -67,7 +67,7 @@ if [ ! -x "$built_binary" ]; then
   echo "development build did not produce an executable: $built_binary" >&2
   exit 1
 fi
-staged=$(mktemp "$bin_dir/.spynel.dev.XXXXXX")
+staged=$(mktemp "$bin_dir/.iris.dev.XXXXXX")
 cleanup() {
   if [ -e "$staged" ]; then
     unlink "$staged"
@@ -78,6 +78,16 @@ cp "$built_binary" "$staged"
 chmod 0755 "$staged"
 mv -f "$staged" "$target"
 trap - EXIT HUP INT TERM
+legacy_target="$bin_dir/spynel"
+if [ -L "$legacy_target" ]; then
+  if [ "$legacy_target" -ef "$built_binary" ] || [ "$legacy_target" -ef "$target" ]; then
+    unlink "$legacy_target"
+  else
+    echo "Warning: leaving unowned legacy command: $legacy_target" >&2
+  fi
+elif [ -e "$legacy_target" ]; then
+  echo "Warning: leaving unowned legacy command: $legacy_target" >&2
+fi
 
 path_contains() {
   previous_ifs=$IFS
@@ -105,14 +115,14 @@ EOF
   exit 0
 fi
 
-resolved=$(command -v spynel || true)
+resolved=$(command -v iris || true)
 if [ "$resolved" != "$target" ]; then
   cat <<EOF
 
-Warning: PATH currently resolves spynel to ${resolved:-another location} before $target.
+Warning: PATH currently resolves iris to ${resolved:-another location} before $target.
 Move $bin_dir earlier in PATH to run this development build by name.
 EOF
   exit 0
 fi
 
-echo "Ready: run 'spynel' from this or any other terminal."
+echo "Ready: run 'iris' from this or any other terminal."

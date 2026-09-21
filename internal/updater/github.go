@@ -15,8 +15,8 @@ import (
 	"time"
 )
 
-const defaultGitHubURL = "https://api.github.com/repos/agent0ai/spynel/releases/latest"
-const defaultDownloadURL = "https://github.com/agent0ai/spynel/releases/download/v"
+const defaultGitHubURL = "https://api.github.com/repos/edheltzel/Iris/releases/latest"
+const defaultDownloadURL = "https://github.com/edheltzel/Iris/releases/download/v"
 const maxArchiveBytes = 512 << 20
 const maxChecksumBytes = 1 << 20
 
@@ -26,7 +26,7 @@ func stableVersion(version string) bool {
 }
 
 func archiveName(version string) string {
-	return fmt.Sprintf("spynel_%s_%s_%s.tar.gz", strings.TrimPrefix(version, "v"), runtime.GOOS, runtime.GOARCH)
+	return fmt.Sprintf("iris_%s_%s_%s.tar.gz", strings.TrimPrefix(version, "v"), runtime.GOOS, runtime.GOARCH)
 }
 
 // releaseClient retains injected transports but always bounds redirects and
@@ -148,6 +148,6 @@ func (m *Manager) Install(ctx context.Context, version string) error {
 			return closeErr
 		}
 	}
-	_, err = InstallArchive(ctx, m.InstallRoot, filepath.Join(temp, archiveName(version)), filepath.Join(temp, "checksums.txt"), version)
+	_, err = InstallArchive(ctx, m.InstallRoot, filepath.Join(temp, archiveName(version)), filepath.Join(temp, "checksums.txt"), version, m.MigrateLegacyStartup)
 	return err
 }

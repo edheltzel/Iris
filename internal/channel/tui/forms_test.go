@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agent0ai/spynel/internal/core"
+	"github.com/edheltzel/iris/internal/core"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 )

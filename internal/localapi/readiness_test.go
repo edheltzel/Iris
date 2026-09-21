@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/instance"
+	"github.com/edheltzel/iris/internal/instance"
 )
 
 func TestReadinessTimeoutOffersConditionalStoppedJobRecovery(t *testing.T) {

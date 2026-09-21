@@ -3,9 +3,9 @@
 Spynel uses portable executable hooks instead of Go's platform/toolchain-coupled plugin mechanism. Install repositories only after review:
 
 ```bash
-spynel extension install GIT_URL [NAME]
-spynel extension list
-spynel extension remove NAME
+iris extension install GIT_URL [NAME]
+iris extension list
+iris extension remove NAME
 ```
 
 Each repository declares `.spynel-extension.yaml`:

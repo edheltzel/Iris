@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/config"
+	"github.com/edheltzel/iris/internal/config"
 )
 
 var nonSlug = regexp.MustCompile(`[^a-z0-9]+`)

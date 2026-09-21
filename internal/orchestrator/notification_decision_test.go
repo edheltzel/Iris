@@ -12,11 +12,11 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/agent0ai/spynel/internal/config"
-	"github.com/agent0ai/spynel/internal/core"
-	"github.com/agent0ai/spynel/internal/extensions"
-	"github.com/agent0ai/spynel/internal/instructions"
-	"github.com/agent0ai/spynel/internal/workspace"
+	"github.com/edheltzel/iris/internal/config"
+	"github.com/edheltzel/iris/internal/core"
+	"github.com/edheltzel/iris/internal/extensions"
+	"github.com/edheltzel/iris/internal/instructions"
+	"github.com/edheltzel/iris/internal/workspace"
 )
 
 type notificationActionHarness struct {
@@ -609,8 +609,8 @@ func TestNotificationCommandGuidanceShellQuotesFrameworkPaths(t *testing.T) {
 			t.Fatalf("shellQuote(%q) = %q, want %q", input, got, want)
 		}
 	}
-	command := notificationCommand("/opt/Spynel Current/spynel", "/tmp/work's space", "telegram/TG-$(unsafe)")
-	want := `'/opt/Spynel Current/spynel' notify --workdir '/tmp/work'"'"'s space' --origin 'telegram/TG-$(unsafe)' --message "Hello there"`
+	command := notificationCommand("/opt/Spynel Current/iris", "/tmp/work's space", "telegram/TG-$(unsafe)")
+	want := `'/opt/Spynel Current/iris' notify --workdir '/tmp/work'"'"'s space' --origin 'telegram/TG-$(unsafe)' --message "Hello there"`
 	if command != want {
 		t.Fatalf("shell-safe notification command = %q, want %q", command, want)
 	}
@@ -618,8 +618,8 @@ func TestNotificationCommandGuidanceShellQuotesFrameworkPaths(t *testing.T) {
 
 func TestNotificationCommandsBindEveryTaskOriginAndWorkspace(t *testing.T) {
 	for _, origin := range []string{"tui/new-6rrwdamb", "cli/local", "telegram/TG-518743883", "whatsapp/WA-15551234567"} {
-		command := notificationCommand("/root/.local/bin/spynel", "/workspace", origin)
-		want := `/root/.local/bin/spynel notify --workdir /workspace --origin '` + origin + `' --message "Hello there"`
+		command := notificationCommand("/root/.local/bin/iris", "/workspace", origin)
+		want := `/root/.local/bin/iris notify --workdir /workspace --origin '` + origin + `' --message "Hello there"`
 		if command != want {
 			t.Fatalf("command for %s = %q, want %q", origin, command, want)
 		}

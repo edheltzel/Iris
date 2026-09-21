@@ -11,7 +11,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/agent0ai/spynel/internal/channel/tui/textarea/memoization"
+	"github.com/edheltzel/iris/internal/channel/tui/textarea/memoization"
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/key"

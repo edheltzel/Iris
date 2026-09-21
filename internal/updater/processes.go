@@ -17,8 +17,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/fsx"
+	"github.com/edheltzel/iris/internal/fsx"
+	"github.com/edheltzel/iris/internal/instance"
 )
+
+const legacyProcessModule = "github.com/agent0ai/spynel"
 
 // ProcessRegistration identifies a live server/TUI, including secondary TUIs
 // and servers in other workspaces. It contains no workspace credentials.
@@ -33,11 +36,14 @@ type ProcessRegistration struct {
 }
 
 func processDirectory() (string, error) {
-	directory, err := os.UserConfigDir()
+	if _, err := instance.EnvironmentID(); err != nil {
+		return "", fmt.Errorf("prepare process identity directory: %w", err)
+	}
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	directory = filepath.Join(directory, "spynel", "processes")
+	directory := filepath.Join(home, ".agents", "Iris", "processes")
 	if err := privateDirectory(directory); err != nil {
 		return "", err
 	}
@@ -138,6 +144,35 @@ func processMatches(record ProcessRegistration, path string) bool {
 		strings.HasPrefix(filepath.Base(npmRootFromExecutable(path)), "."+filepath.Base(root)+"-")
 }
 
+func legacyProcessRoot(path string) string {
+	path = strings.TrimSuffix(path, " (deleted)")
+	if filepath.Base(path) != "spynel" {
+		return ""
+	}
+	bundle := filepath.Dir(path)
+	releases := filepath.Dir(bundle)
+	root := filepath.Dir(releases)
+	if filepath.Base(releases) == "releases" && ownedRoot(root) {
+		if _, err := readBundle(bundle); err == nil {
+			return root
+		}
+	}
+	root = npmRootFromExecutable(path)
+	if validNPMRootPackage(root, "", "spynel") {
+		return root
+	}
+	return ""
+}
+
+func legacyProcessOwned(record ProcessRegistration, path string) bool {
+	root := legacyProcessRoot(path)
+	if root == record.Installation {
+		return root != ""
+	}
+	return root != "" && record.Installation != "" && npmRootFromExecutable(strings.TrimSuffix(path, " (deleted)")) == root &&
+		filepath.Dir(root) == filepath.Dir(record.Installation) && strings.HasPrefix(filepath.Base(root), "."+filepath.Base(record.Installation)+"-")
+}
+
 func liveProcesses() ([]ProcessRegistration, error) {
 	ids, err := installationProcessIDs()
 	if err != nil {
@@ -177,21 +212,31 @@ func processRecords(ids []int) ([]ProcessRegistration, error) {
 				records = append(records, record)
 				continue
 			}
+			if err == nil && info.Path == legacyProcessModule && legacyProcessOwned(record, path) {
+				record.Generation = ""
+				records = append(records, record)
+				continue
+			}
 		}
-		if filepath.Base(strings.TrimSuffix(path, " (deleted)")) != "spynel" {
+		executable := strings.TrimSuffix(path, " (deleted)")
+		name := filepath.Base(executable)
+		if name != "iris" && name != "spynel" {
 			continue
 		}
 		info, err := buildinfo.ReadFile(processImagePath(pid, path))
-		if err == nil && info.Path == own.Path {
-			executable := strings.TrimSuffix(path, " (deleted)")
+		if err == nil && info.Path == own.Path && name == "iris" {
 			root := npmRootFromExecutable(executable)
-			if strings.HasPrefix(filepath.Base(root), ".spynel-") {
-				root = filepath.Join(filepath.Dir(root), "spynel")
+			if strings.HasPrefix(filepath.Base(root), ".iris-") {
+				root = filepath.Join(filepath.Dir(root), "iris")
 			}
 			if !validNPMRoot(root, "") {
 				root = ""
 			}
 			records = append(records, ProcessRegistration{PID: pid, Executable: executable, Installation: root})
+		} else if err == nil && info.Path == legacyProcessModule && name == "spynel" {
+			if root := legacyProcessRoot(executable); root != "" {
+				records = append(records, ProcessRegistration{PID: pid, Executable: executable, Installation: root})
+			}
 		}
 	}
 	return records, nil
@@ -204,7 +249,7 @@ func (m *Manager) CheckRestartable() error {
 		return errors.New("updates require a managed Spynel installation")
 	}
 	if m.PackageRoot != "" && !m.CoordinatedUpdates {
-		return errors.New("this npm launcher does not support coordinated updates; run the installed spynel killall command once, then relaunch Spynel")
+		return errors.New("this npm launcher does not support coordinated updates; run the installed iris killall command once, then relaunch Spynel")
 	}
 	records, err := liveProcesses()
 	if err != nil {
@@ -212,7 +257,7 @@ func (m *Manager) CheckRestartable() error {
 	}
 	for _, record := range records {
 		if (record.Installation == root || m.ownsProcessPath(root, record.Executable)) && (record.Generation == "" || record.Installation != root || m.PackageRoot != "" && !record.CoordinatedUpdates) {
-			return fmt.Errorf("Spynel process %d has no valid coordinated-restart registration; run spynel killall once, then launch the current version", record.PID)
+			return fmt.Errorf("Spynel process %d has no valid coordinated-restart registration; run iris killall once, then launch the current version", record.PID)
 		}
 	}
 	return nil

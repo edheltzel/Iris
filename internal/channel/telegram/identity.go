@@ -9,8 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/agent0ai/spynel/internal/config"
-	"github.com/agent0ai/spynel/internal/fsx"
+	"github.com/edheltzel/iris/internal/config"
+	"github.com/edheltzel/iris/internal/fsx"
 )
 
 const identityStateVersion = 1

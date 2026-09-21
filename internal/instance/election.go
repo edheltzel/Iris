@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/fsx"
+	"github.com/edheltzel/iris/internal/fsx"
 )
 
 const (
@@ -94,18 +94,70 @@ func (e *Election) ID() string            { return e.id }
 func (e *Election) EnvironmentID() string { return e.environmentID }
 
 // EnvironmentID returns a non-secret digest of a private random token stored
-// in the operating system's per-user configuration directory. This models the
-// supported loopback-connectivity boundary: ordinary processes for one local
-// installation share it, while a host and its containers (and normally two
-// containers) use different configuration homes. It deliberately does not use
-// hostnames, paths, MAC addresses, machine IDs, boot IDs, or Linux namespace
-// inode values.
+// under $HOME/.agents/Iris. This models the supported loopback-connectivity
+// boundary: ordinary processes for one local installation share it, while a
+// host and its containers (and normally two containers) use different homes.
+// It deliberately does not use hostnames, paths, MAC addresses, machine IDs,
+// boot IDs, or Linux namespace inode values.
 func EnvironmentID() (string, error) {
-	directory, err := os.UserConfigDir()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("locate environment identity directory: %w", err)
 	}
-	path := filepath.Join(directory, "spynel", "environment-token")
+	root := filepath.Join(home, ".agents", "Iris")
+	path := filepath.Join(root, "environment-token")
+	hasToken, err := environmentTokenExists(root)
+	if err != nil {
+		return "", fmt.Errorf("inspect environment identity directory: %w", err)
+	}
+	if directory, configErr := os.UserConfigDir(); configErr == nil {
+		iris := filepath.Join(directory, "iris")
+		spynel := filepath.Join(directory, "spynel")
+		irisToken, err := environmentTokenExists(iris)
+		if err != nil {
+			return "", fmt.Errorf("inspect Iris identity migration source: %w", err)
+		}
+		spynelToken, err := environmentTokenExists(spynel)
+		if err != nil {
+			return "", fmt.Errorf("inspect Spynel identity migration source: %w", err)
+		}
+		var source string
+		switch {
+		case irisToken && spynelToken:
+			return "", errors.New("both legacy environment identity sources contain tokens")
+		case irisToken:
+			source = iris
+		case spynelToken:
+			source = spynel
+		case !hasToken:
+			err = fsx.MergeDir(root, spynel)
+			if err == nil {
+				hasToken, err = environmentTokenExists(root)
+			}
+			if err == nil && !hasToken {
+				err = fsx.MergeDir(root, iris)
+			}
+		}
+		if err == nil && source != "" {
+			if hasToken {
+				destinationToken, tokenErr := readEnvironmentToken(path)
+				if tokenErr != nil {
+					return "", fmt.Errorf("read destination environment identity: %w", tokenErr)
+				}
+				sourceToken, tokenErr := readEnvironmentToken(filepath.Join(source, "environment-token"))
+				if tokenErr != nil {
+					return "", fmt.Errorf("read legacy environment identity: %w", tokenErr)
+				}
+				if sourceToken != destinationToken {
+					return "", errors.New("legacy environment identity conflicts with destination")
+				}
+			}
+			err = fsx.MergeDir(root, source)
+		}
+		if err != nil {
+			return "", fmt.Errorf("migrate environment identity directory: %w", err)
+		}
+	}
 	token, err := readEnvironmentToken(path)
 	if errors.Is(err, os.ErrNotExist) {
 		data := make([]byte, environmentTokenBytes)
@@ -123,6 +175,14 @@ func EnvironmentID() (string, error) {
 	}
 	digest := sha256.Sum256([]byte("spynel-loopback-environment-v1\x00" + token))
 	return hex.EncodeToString(digest[:]), nil
+}
+
+func environmentTokenExists(directory string) (bool, error) {
+	_, err := os.Lstat(filepath.Join(directory, "environment-token"))
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	return err == nil, err
 }
 
 func readEnvironmentToken(path string) (string, error) {

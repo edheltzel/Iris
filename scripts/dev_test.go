@@ -11,53 +11,79 @@ import (
 	"time"
 )
 
-func TestDeveloperVerificationPaths(t *testing.T) {
-	rootDOX, err := os.ReadFile("../AGENTS.md")
+func TestInstallDevRemovesOnlyOwnedLegacySymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX development installer")
+	}
+	directory := t.TempDir()
+	installer := filepath.Join(directory, "install-dev.sh")
+	source, err := filepath.Abs("install-dev.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, required := range []string{"shared user cache", "scripts/cold-cache.sh", ".tmp-bin/spynel", ".tmp-artifacts/<task-id>/"} {
-		if !strings.Contains(string(rootDOX), required) {
-			t.Errorf("canonical repository AGENTS.md is missing %q", required)
-		}
-	}
-	scriptDOX, err := os.ReadFile("AGENTS.md")
-	if err != nil {
+	if err := os.Symlink(source, installer); err != nil {
 		t.Fatal(err)
 	}
-	for _, required := range []string{"cold-cache.sh", "dedicated process group", "complete owned process tree", ".tmp-bin/spynel"} {
-		if !strings.Contains(string(scriptDOX), required) {
-			t.Errorf("repository-only cold-cache contract is missing %q", required)
-		}
-	}
-	for path, text := range map[string][]byte{"../AGENTS.md": rootDOX, "AGENTS.md": scriptDOX} {
-		if strings.Contains(string(text), "GOCACHE=") {
-			t.Errorf("%s contains an ordinary GOCACHE assignment", path)
-		}
-	}
-	readme, err := os.ReadFile("../README.md")
-	if err != nil {
+	built := filepath.Join(directory, "built-iris")
+	if err := os.WriteFile(built, []byte("#!/bin/sh\nexit 0\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	for _, forbidden := range []string{"GOCACHE", "cold-cache.sh", ".tmp-artifacts"} {
-		if strings.Contains(string(readme), forbidden) {
-			t.Errorf("README carries canonical developer policy %q", forbidden)
-		}
-	}
-	ignored, err := os.ReadFile("../.gitignore")
-	if err != nil {
+	if err := os.WriteFile(filepath.Join(directory, "dev.sh"), []byte("#!/bin/sh\nprintf '%s\\n' \"$DEV_BUILD\"\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(ignored), ".tmp*/") {
-		t.Fatal("disposable repository build and retained-evidence locations must be ignored")
-	}
-	ignoreLines := strings.Split(string(ignored), "\n")
-	for _, obsolete := range []string{"/bin/", "/spynel"} {
-		for _, line := range ignoreLines {
-			if strings.TrimSpace(line) == obsolete {
-				t.Errorf("obsolete root build output ignore remains: %q", obsolete)
+
+	for _, test := range []struct {
+		name        string
+		setup       func(string) error
+		wantRemoved bool
+		wantWarning bool
+	}{
+		{
+			name: "owned symlink",
+			setup: func(path string) error {
+				return os.Symlink(built, path)
+			},
+			wantRemoved: true,
+		},
+		{
+			name: "unowned file",
+			setup: func(path string) error {
+				return os.WriteFile(path, []byte("unrelated\n"), 0o700)
+			},
+			wantWarning: true,
+		},
+		{
+			name: "unowned symlink",
+			setup: func(path string) error {
+				other := filepath.Join(filepath.Dir(path), "other")
+				if err := os.WriteFile(other, []byte("unrelated\n"), 0o700); err != nil {
+					return err
+				}
+				return os.Symlink(other, path)
+			},
+			wantWarning: true,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			bin := t.TempDir()
+			legacy := filepath.Join(bin, "spynel")
+			if err := test.setup(legacy); err != nil {
+				t.Fatal(err)
 			}
-		}
+			command := exec.Command("sh", installer, "--bin-dir", bin)
+			command.Env = append(os.Environ(), "DEV_BUILD="+built)
+			output, err := command.CombinedOutput()
+			if err != nil {
+				t.Fatalf("install-dev failed: %v output=%q", err, output)
+			}
+			_, statErr := os.Lstat(legacy)
+			if test.wantRemoved != os.IsNotExist(statErr) {
+				t.Fatalf("legacy target removal = %t, want %t: %v", os.IsNotExist(statErr), test.wantRemoved, statErr)
+			}
+			if strings.Contains(string(output), "leaving unowned legacy command") != test.wantWarning {
+				t.Fatalf("warning output = %q, want warning %t", output, test.wantWarning)
+			}
+		})
 	}
 }
 

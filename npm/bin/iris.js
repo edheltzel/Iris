@@ -40,7 +40,7 @@ function createLaunchEnvironment(parentEnvironment = process.env, periodicChecks
 }
 
 function coordinateInstances(command, environment) {
-  const result = childProcess.spawnSync(path.join(packageRoot, "npm", "vendor", "spynel"), [command], {
+  const result = childProcess.spawnSync(path.join(packageRoot, "npm", "vendor", "iris"), [command], {
     stdio: ["ignore", "ignore", "inherit"], env: environment, timeout: 40_000
   });
   if (result.error || result.status !== 0) {
@@ -77,7 +77,7 @@ async function main() {
 
   const environment = createLaunchEnvironment(process.env, periodicChecks, startupUpdateCheckedAt, startupUpdate);
   for (;;) {
-    const binary = path.join(__dirname, "..", "vendor", "spynel");
+    const binary = path.join(__dirname, "..", "vendor", "iris");
     const result = await new Promise(resolve => {
       const child = childProcess.spawn(binary, args, { stdio: "inherit", env: environment });
       const signals = ["SIGINT", "SIGTERM", "SIGHUP"].map(signal => [signal, () => child.kill(signal)]);

@@ -10,24 +10,26 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/user"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/app"
-	"github.com/agent0ai/spynel/internal/channel"
-	"github.com/agent0ai/spynel/internal/channel/tui"
-	"github.com/agent0ai/spynel/internal/config"
-	"github.com/agent0ai/spynel/internal/core"
-	"github.com/agent0ai/spynel/internal/harness"
-	"github.com/agent0ai/spynel/internal/history"
-	"github.com/agent0ai/spynel/internal/instance"
-	"github.com/agent0ai/spynel/internal/localapi"
-	"github.com/agent0ai/spynel/internal/updater"
-	"github.com/agent0ai/spynel/internal/workspace"
+	"github.com/edheltzel/iris/internal/app"
+	"github.com/edheltzel/iris/internal/channel"
+	"github.com/edheltzel/iris/internal/channel/tui"
+	"github.com/edheltzel/iris/internal/config"
+	"github.com/edheltzel/iris/internal/core"
+	"github.com/edheltzel/iris/internal/harness"
+	"github.com/edheltzel/iris/internal/history"
+	"github.com/edheltzel/iris/internal/instance"
+	"github.com/edheltzel/iris/internal/localapi"
+	"github.com/edheltzel/iris/internal/updater"
+	"github.com/edheltzel/iris/internal/workspace"
 )
 
 type heldCLIHarness struct {
@@ -35,6 +37,69 @@ type heldCLIHarness struct {
 	emits   map[string]core.Emit
 	prompts map[string][]string
 	threads map[string]string
+}
+
+func TestMain(m *testing.M) {
+	root, err := os.MkdirTemp("", "iris-cli-test-")
+	if err != nil {
+		panic(err)
+	}
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		panic(err)
+	}
+	for name, value := range map[string]string{
+		"HOME":            filepath.Join(root, "home"),
+		"XDG_CONFIG_HOME": filepath.Join(root, "config"),
+		"XDG_CACHE_HOME":  filepath.Join(root, "cache"),
+	} {
+		if err := os.Setenv(name, value); err != nil {
+			panic(err)
+		}
+	}
+	code := m.Run()
+	_ = os.RemoveAll(root)
+	os.Exit(code)
+}
+
+func TestStartupManagerForLegacyProcess(t *testing.T) {
+	root := t.TempDir()
+	for _, test := range []struct {
+		name         string
+		executable   string
+		wantCommand  string
+		wantLauncher string
+	}{
+		{name: "standalone", executable: filepath.Join(root, "releases", "old", "spynel"), wantCommand: filepath.Join(root, "spynel")},
+		{name: "npm", executable: filepath.Join(root, "npm", "vendor", "spynel"), wantCommand: filepath.Join(root, "npm", "vendor", "spynel"), wantLauncher: filepath.Join(root, "npm", "bin", "spynel.js")},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			manager, err := startupManagerForProcess(updater.ProcessRegistration{Executable: test.executable, Installation: root})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if manager.Executable != test.wantCommand || manager.NPMLauncher != test.wantLauncher {
+				t.Fatalf("startup owner = %q, %q; want %q, %q", manager.Executable, manager.NPMLauncher, test.wantCommand, test.wantLauncher)
+			}
+		})
+	}
+}
+
+func TestCleanupUserHomeUsesAccountHome(t *testing.T) {
+	account, err := user.LookupId(strconv.Itoa(os.Getuid()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	home, err := cleanupUserHome(os.Getuid())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if home != filepath.Clean(account.HomeDir) {
+		t.Fatalf("cleanup home = %q, want account home %q", home, account.HomeDir)
+	}
+	if home == filepath.Clean(os.Getenv("HOME")) {
+		t.Fatal("cleanup home followed the test process HOME")
+	}
 }
 
 func TestRecordCommandFailurePersistsGenericEvidenceWithoutErrorContent(t *testing.T) {
@@ -394,8 +459,8 @@ func TestWorkflowListAliasPreservesSharedAndListOptions(t *testing.T) {
 
 func TestWorkflowListAliasesAreDocumentedForExternalPrograms(t *testing.T) {
 	for _, want := range []string{
-		"spynel tasks [flags] [VIEW]",
-		"spynel goals [flags] [VIEW]",
+		"iris tasks [flags] [VIEW]",
+		"iris goals [flags] [VIEW]",
 		"open|recent|active|review|waiting|done|failed|all",
 		"--config PATH",
 		"--conversation NAME",
@@ -762,7 +827,7 @@ func TestOfflineUpdateInstallReturnsControlToNPMLauncher(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(packageRoot, "npm", "vendor"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(packageRoot, "package.json"), []byte(`{"name":"spynel","version":"1.2.0"}`), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(packageRoot, "package.json"), []byte(`{"name":"@edheltzel/iris","version":"1.2.0"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(packageRoot, "npm", "vendor", ".installed.json"), []byte(`{"version":"1.2.0"}`), 0o600); err != nil {
@@ -772,11 +837,11 @@ func TestOfflineUpdateInstallReturnsControlToNPMLauncher(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Link(executable, filepath.Join(packageRoot, "npm", "vendor", "spynel")); err != nil {
+	if err := os.Link(executable, filepath.Join(packageRoot, "npm", "vendor", "iris")); err != nil {
 		t.Fatal(err)
 	}
 	registry := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
-		_, _ = writer.Write([]byte(`{"name":"spynel","version":"1.3.0"}`))
+		_, _ = writer.Write([]byte(`{"name":"@edheltzel/iris","version":"1.3.0"}`))
 	}))
 	defer registry.Close()
 	t.Setenv("SPYNEL_NPM_PACKAGE_ROOT", packageRoot)
@@ -826,13 +891,13 @@ func TestInitNoStartCreatesWorkspaceWithoutEnteringTUI(t *testing.T) {
 }
 
 func TestSendCommandValidatesScriptableArguments(t *testing.T) {
-	if err := run([]string{"send"}, "test"); err == nil || !strings.Contains(err.Error(), "usage: spynel send") {
+	if err := run([]string{"send"}, "test"); err == nil || !strings.Contains(err.Error(), "usage: iris send") {
 		t.Fatalf("missing send text error = %v", err)
 	}
 	if err := run([]string{"send", "--conversation", "", "hello"}, "test"); err == nil || !strings.Contains(err.Error(), "cannot be empty") {
 		t.Fatalf("empty conversation error = %v", err)
 	}
-	if !strings.Contains(helpText, "spynel send") || !strings.Contains(helpText, "--conversation") {
+	if !strings.Contains(helpText, "iris send") || !strings.Contains(helpText, "--conversation") {
 		t.Fatalf("send command is not documented in CLI help:\n%s", helpText)
 	}
 }
@@ -1426,7 +1491,7 @@ func TestStartupConnectionStatusIsVisibleBoundedAndOptional(t *testing.T) {
 	status := newStartupConnectionStatus(&output, true)
 	status.connecting()
 	status.connected()
-	want := "Connecting to the existing Spynel primary…\nConnected to the existing Spynel primary.\n"
+	want := "Connecting to the existing Iris primary…\nConnected to the existing Iris primary.\n"
 	if output.String() != want {
 		t.Fatalf("successful startup status = %q", output.String())
 	}

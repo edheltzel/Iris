@@ -3,10 +3,10 @@
 Start with:
 
 ```bash
-spynel doctor
+iris doctor
 ```
 
-Use `/status` in any interface for the current owner, harness, channel, workflow, and job summary. Use `/log` for bounded runtime diagnostics and `spynel instructions` to validate persistent instruction files without printing their contents.
+Use `/status` in any interface for the current owner, harness, channel, workflow, and job summary. Use `/log` for bounded runtime diagnostics and `iris instructions` to validate persistent instruction files without printing their contents.
 
 If the semantic heartbeat appears stuck, inspect its ordinary live job with `/jobs` or `/job info`, confirm the configured harness is available, and use `/trigger heartbeat` only when it is idle. The framework ignores all heartbeat provider output and creates no result, health, incident, escalation, fallback, or retry state. Inspect the durable task/goal progress logs for actions the heartbeat worker actually performed. Ordinary actionable task transitions invoke the notification agent directly; that agent calls the ordinary notification CLI when useful and edits the task log itself.
 
@@ -17,7 +17,7 @@ After a job finishes or the primary restarts, use `/jobs recent`, then `/job inf
 ## Installation or startup
 
 - The standalone public one-liner requires URL routing and a release containing standalone installer support. If it is unavailable, use npm or the development steps in [getting started](getting-started.md).
-- Run `spynel` from the directory that should own the workspace. Its private configuration and state live in that directory's fixed `.spynel/` folder.
+- Run `iris` from the directory that should own the workspace. Its private configuration and state live in that directory's fixed `.spynel/` folder.
 - If a development install is not found, follow the exact PATH guidance printed by `scripts/install-dev.sh`, or choose a writable directory already on PATH with `--bin-dir`.
 - The configuration must be `.spynel/config.yaml` and match the current schema. Unknown or obsolete fields fail validation with their source location.
 - If startup says the workspace primary is active in another host/container environment, the shared workspace is advertising a loopback API that is reachable only inside the owner's environment. Stop that primary cleanly and start Spynel where you want ownership, or run both processes in the same host/container environment. This detection does not expose the API to the host and does not add a relay or port-forwarding mode.
@@ -39,8 +39,8 @@ After a job finishes or the primary restarts, use `/jobs recent`, then `/job inf
 
 ## Updates, speech, and automation
 
-- Automatic npm update checks occur only for interactive npm-launched starts. When a new version is available, the startup offer shows both versions and skips automatically after a ten-second countdown unless you answer Yes; No or any other answer also skips safely. `/update check` reports availability; `/update` updates and restarts all instances of the selected managed installation. `spynel killall` stops every verified Spynel process the caller can control. If an older instance cannot receive coordinated restart, the update reports it; stop it once with the current `spynel killall` command, then relaunch. Development and manually extracted archive binaries remain unmanaged. Script installation failures preserve the prior runtime; if another installer is active, wait for it to finish and retry.
-- Speech accepts WAV, FLAC, MP3, and Telegram/WhatsApp Ogg/Opus voice notes. M4A/AAC, WebM, and other formats return an unsupported-format error. First supported use downloads a checksum-pinned model into the operating system's per-user cache unless `speech.model_dir` is configured.
+- Automatic npm update checks occur only for interactive npm-launched starts. When a new version is available, the startup offer shows both versions and skips automatically after a ten-second countdown unless you answer Yes; No or any other answer also skips safely. `/update check` reports availability; `/update` updates and restarts all instances of the selected managed installation. `iris killall` stops every verified Spynel process the caller can control. If an older instance cannot receive coordinated restart, the update reports it; stop it once with the current `iris killall` command, then relaunch. Development and manually extracted archive binaries remain unmanaged. Script installation failures preserve the prior runtime; if another installer is active, wait for it to finish and retry.
+- Speech accepts WAV, FLAC, MP3, and Telegram/WhatsApp Ogg/Opus voice notes. M4A/AAC, WebM, and other formats return an unsupported-format error. First supported use downloads a checksum-pinned model under `$HOME/.agents/Iris/speech` unless `speech.model_dir` is configured.
 - Plain CLI flags precede positional command arguments. Add `--stream` for text deltas or `--json` for NDJSON events; default `send` output is only the final assistant message.
 
 Continue with [communication integrations](integrations.md), [configuration](configuration.md), or the [plain CLI guide](cli.md) for complete behavior and settings.

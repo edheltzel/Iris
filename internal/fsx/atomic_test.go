@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 )
 
@@ -18,5 +19,96 @@ func TestAtomicCreateFileNeverReplacesExistingContent(t *testing.T) {
 	data, err := os.ReadFile(path)
 	if err != nil || string(data) != "owner edit" {
 		t.Fatalf("existing content = %q, %v", data, err)
+	}
+}
+
+func TestMigrateDirFallsBackWhenRenameFails(t *testing.T) {
+	source := filepath.Join(t.TempDir(), "legacy")
+	dest := filepath.Join(t.TempDir(), "current")
+	if err := os.MkdirAll(filepath.Join(source, "nested"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "nested", "value"), []byte("kept"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	originalRename := renameDirectory
+	calls := 0
+	renameDirectory = func(oldPath, newPath string) error {
+		calls++
+		if calls == 1 {
+			return syscall.EXDEV
+		}
+		return originalRename(oldPath, newPath)
+	}
+	t.Cleanup(func() { renameDirectory = originalRename })
+	if err := MigrateDir(dest, source); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(dest, "nested", "value"))
+	if err != nil || string(data) != "kept" || calls < 2 {
+		t.Fatalf("migrated data = %q, calls = %d, err = %v", data, calls, err)
+	}
+	if _, err := os.Stat(source); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("legacy directory remains: %v", err)
+	}
+	if info, err := os.Stat(filepath.Join(dest, "nested", "value")); err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("migrated mode = %v, err = %v", info, err)
+	}
+}
+
+func TestMigrateDirAcceptsConcurrentCopyWinner(t *testing.T) {
+	source := filepath.Join(t.TempDir(), "legacy")
+	dest := filepath.Join(t.TempDir(), "current")
+	if err := os.Mkdir(source, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	originalRename := renameDirectory
+	originalCopy := copyMigrationDirectory
+	renameDirectory = func(string, string) error { return syscall.EXDEV }
+	copyMigrationDirectory = func(string, string) error {
+		if err := os.Mkdir(dest, 0o700); err != nil {
+			return err
+		}
+		if err := os.RemoveAll(source); err != nil {
+			return err
+		}
+		return &os.PathError{Op: "open", Path: source, Err: syscall.ENOENT}
+	}
+	t.Cleanup(func() {
+		renameDirectory = originalRename
+		copyMigrationDirectory = originalCopy
+	})
+	if err := MigrateDir(dest, source); err != nil {
+		t.Fatal(err)
+	}
+	if info, err := os.Stat(dest); err != nil || !info.IsDir() {
+		t.Fatalf("published destination = %v, err = %v", info, err)
+	}
+}
+
+func TestMergeDirPreservesMatchingEntriesAndAddsLeftovers(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "legacy", "iris")
+	dest := filepath.Join(root, "agents", "Iris")
+	for _, directory := range []string{source, dest} {
+		if err := os.MkdirAll(filepath.Join(directory, "nested"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(directory, "nested", "shared"), []byte("same"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(source, "leftover"), []byte("kept"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := MergeDir(dest, source); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(dest, "leftover"))
+	if err != nil || string(data) != "kept" {
+		t.Fatalf("merged leftover = %q, %v", data, err)
+	}
+	if _, err := os.Stat(source); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("merged source remains: %v", err)
 	}
 }

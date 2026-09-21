@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/agent0ai/spynel/internal/app"
-	"github.com/agent0ai/spynel/internal/core"
-	"github.com/agent0ai/spynel/internal/instance"
+	"github.com/edheltzel/iris/internal/app"
+	"github.com/edheltzel/iris/internal/core"
+	"github.com/edheltzel/iris/internal/instance"
 )
 
 func TestGlobalJobActivityReachesPrimaryAndAttachedTUI(t *testing.T) {

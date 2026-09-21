@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/agent0ai/spynel/internal/core"
+	"github.com/edheltzel/iris/internal/core"
 )
 
 const replyPreviewRunes = 100

@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/fsx"
+	"github.com/edheltzel/iris/internal/fsx"
 )
 
 const (
@@ -134,7 +134,7 @@ func run(opts options) error {
 		return err
 	}
 
-	tempRoot, err := os.MkdirTemp("", "spynel-native-evidence-")
+	tempRoot, err := os.MkdirTemp("", "iris-native-evidence-")
 	if err != nil {
 		return err
 	}
@@ -162,24 +162,24 @@ func run(opts options) error {
 	env := smokeEnvironment(home, filepath.Dir(binary))
 
 	output, commandErr := runCommand(extractRoot, env, binary, "--version")
-	if commandErr == nil && !containsOutputLine(output, "spynel "+version) {
+	if commandErr == nil && !containsOutputLine(output, "iris "+version) {
 		commandErr = errors.New("packaged version does not match archive identity")
 	}
-	if err := add("packaged-version", "spynel --version", "packaged executable launches and its version matches the archive identity", commandErr); err != nil {
+	if err := add("packaged-version", "iris --version", "packaged executable launches and its version matches the archive identity", commandErr); err != nil {
 		return err
 	}
 	output, commandErr = runCommand(extractRoot, env, binary, "--help")
-	if commandErr == nil && (!strings.Contains(output, "Spynel -") || !strings.Contains(output, "spynel doctor")) {
+	if commandErr == nil && (!strings.Contains(output, "Iris -") || !strings.Contains(output, "iris doctor")) {
 		commandErr = errors.New("packaged help contract was incomplete")
 	}
-	if err := add("packaged-help", "spynel --help", "harness-independent help launches from the extracted archive", commandErr); err != nil {
+	if err := add("packaged-help", "iris --help", "harness-independent help launches from the extracted archive", commandErr); err != nil {
 		return err
 	}
 	output, commandErr = runCommand(extractRoot, env, binary, "init", "--no-start", "--dir", workspace)
-	if commandErr == nil && !strings.Contains(output, "Initialized Spynel") {
+	if commandErr == nil && !strings.Contains(output, "Initialized Iris") {
 		commandErr = errors.New("initialization confirmation was missing")
 	}
-	if err := add("provider-free-initialization", "spynel init --no-start --dir <awkward-path>", "initialization succeeds without starting or discovering a provider", commandErr); err != nil {
+	if err := add("provider-free-initialization", "iris init --no-start --dir <awkward-path>", "initialization succeeds without starting or discovering a provider", commandErr); err != nil {
 		return err
 	}
 	output, commandErr = runCommand(workspace, env, binary, "doctor")
@@ -189,7 +189,7 @@ func run(opts options) error {
 	} else {
 		commandErr = nil
 	}
-	if err := add("provider-free-detection-guidance", "spynel doctor", "missing providers fail cleanly with harness-selection guidance", commandErr); err != nil {
+	if err := add("provider-free-detection-guidance", "iris doctor", "missing providers fail cleanly with harness-selection guidance", commandErr); err != nil {
 		return err
 	}
 	return writeEvidence(opts.output, record)
@@ -228,7 +228,7 @@ func findNativeArchive(directory, goos, goarch string) (string, string, error) {
 	suffix := "_" + goos + "_" + goarch + extension
 	var matches []string
 	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasPrefix(entry.Name(), "spynel_") && strings.HasSuffix(entry.Name(), suffix) {
+		if !entry.IsDir() && strings.HasPrefix(entry.Name(), "iris_") && strings.HasSuffix(entry.Name(), suffix) {
 			matches = append(matches, filepath.Join(directory, entry.Name()))
 		}
 	}
@@ -236,7 +236,7 @@ func findNativeArchive(directory, goos, goarch string) (string, string, error) {
 		return "", "", fmt.Errorf("expected one archive for native target %s/%s, found %d", goos, goarch, len(matches))
 	}
 	base := filepath.Base(matches[0])
-	version := strings.TrimSuffix(strings.TrimPrefix(base, "spynel_"), suffix)
+	version := strings.TrimSuffix(strings.TrimPrefix(base, "iris_"), suffix)
 	if !safeIdentifier(version) {
 		return "", "", errors.New("archive version is not a bounded path-safe identifier")
 	}
@@ -447,7 +447,7 @@ func copyFile(path string, source io.Reader, mode fs.FileMode) error {
 }
 
 func findPackagedBinary(root string) (string, error) {
-	name := "spynel"
+	name := "iris"
 	if runtime.GOOS == "windows" {
 		name += ".exe"
 	}

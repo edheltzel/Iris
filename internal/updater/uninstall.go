@@ -17,6 +17,7 @@ import (
 // restart registrations. Workspace data is never an installation-owned path.
 func (m *Manager) Uninstall(ctx context.Context, removeStartup func() error) error {
 	root := m.InstallRoot
+	npmPrefix := ""
 	if root == "" {
 		root = m.PackageRoot
 	}
@@ -49,10 +50,15 @@ func (m *Manager) Uninstall(ctx context.Context, removeStartup func() error) err
 		m.InstallRoot = root
 	} else {
 		m.PackageRoot = root
-		modules := filepath.Dir(root)
+		pkg := root
+		if strings.HasPrefix(filepath.Base(filepath.Dir(pkg)), "@") {
+			pkg = filepath.Dir(pkg)
+		}
+		modules := filepath.Dir(pkg)
 		if filepath.Base(modules) != "node_modules" || filepath.Base(filepath.Dir(modules)) != "lib" {
 			return errors.New("unsupported global npm installation layout")
 		}
+		npmPrefix = filepath.Dir(filepath.Dir(modules))
 	}
 	if m.InstallRoot != "" {
 		marker, err := os.Lstat(filepath.Join(root, ".spynel-install"))
@@ -76,8 +82,7 @@ func (m *Manager) Uninstall(ctx context.Context, removeStartup func() error) err
 	if m.InstallRoot == "" {
 		// npm owns its package and launcher links. Pin the prefix rather than
 		// allowing another npm configuration to select a different installation.
-		modules := filepath.Dir(root)
-		command := exec.CommandContext(ctx, "npm", "uninstall", "--global", "--prefix", filepath.Dir(filepath.Dir(modules)), "spynel")
+		command := exec.CommandContext(ctx, "npm", "uninstall", "--global", "--prefix", npmPrefix, "@edheltzel/iris")
 		var output limitedOutput
 		command.Stdout, command.Stderr = &output, &output
 		if err := command.Run(); err != nil {
@@ -93,10 +98,12 @@ func (m *Manager) Uninstall(ctx context.Context, removeStartup func() error) err
 		if !filepath.IsAbs(directory) {
 			continue
 		}
-		path := filepath.Join(directory, "spynel")
-		if installationLink(path, root) {
-			if err := os.Remove(path); err != nil {
-				return err
+		for _, name := range []string{"iris", "spynel"} {
+			path := filepath.Join(directory, name)
+			if installationLink(path, root) {
+				if err := os.Remove(path); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -112,7 +119,15 @@ func (m *Manager) Uninstall(ctx context.Context, removeStartup func() error) err
 			}
 		}
 	}
-	for _, name := range []string{"current", "spynel", "env", ".bin-dir", ".spynel-install", ".install.lock"} {
+	for _, name := range []string{"iris", "spynel"} {
+		path := filepath.Join(root, name)
+		if target, err := os.Readlink(path); err == nil && target == filepath.Join("current", name) {
+			if err := os.Remove(path); err != nil {
+				return err
+			}
+		}
+	}
+	for _, name := range []string{"current", "env", ".bin-dir", ".spynel-install", ".install.lock"} {
 		if err := os.Remove(filepath.Join(root, name)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
@@ -133,7 +148,69 @@ func uninstallNPMRoot(root string) bool {
 	defer file.Close()
 	data, err := io.ReadAll(io.LimitReader(file, 65537))
 	var metadata packageMetadata
-	return err == nil && len(data) <= 65536 && json.Unmarshal(data, &metadata) == nil && metadata.Name == "spynel"
+	return err == nil && len(data) <= 65536 && json.Unmarshal(data, &metadata) == nil && metadata.Name == "@edheltzel/iris"
+}
+
+func (m *Manager) StopLegacyNPM(ctx context.Context, removeStartup func(string) error) error {
+	root := m.PackageRoot
+	if !filepath.IsAbs(root) || root == string(filepath.Separator) {
+		return errors.New("legacy npm cleanup requires an absolute package directory")
+	}
+	root = filepath.Clean(root)
+	info, err := os.Lstat(root)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return errors.New("refusing to clean a legacy npm package symlink or file")
+	}
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		return err
+	}
+	modules := filepath.Dir(root)
+	if filepath.Base(modules) != "node_modules" || filepath.Base(filepath.Dir(modules)) != "lib" {
+		return errors.New("unsupported legacy global npm installation layout")
+	}
+	if !validLegacyNPMRoot(root) {
+		return errors.New("refusing to clean an unmanaged legacy npm package")
+	}
+	m.PackageRoot = root
+	if err := removeStartup(root); err != nil {
+		return err
+	}
+	return m.stopProcesses(ctx, root)
+}
+
+func validLegacyNPMRoot(root string) bool {
+	manifestPath := filepath.Join(root, "package.json")
+	info, err := os.Lstat(manifestPath)
+	if err != nil || !info.Mode().IsRegular() || info.Size() > 65536 {
+		return false
+	}
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return false
+	}
+	var metadata struct {
+		Name       string            `json:"name"`
+		Repository json.RawMessage   `json:"repository"`
+		Bin        map[string]string `json:"bin"`
+	}
+	if json.Unmarshal(data, &metadata) != nil || metadata.Name != "spynel" || metadata.Bin["spynel"] != "npm/bin/spynel.js" {
+		return false
+	}
+	var repository string
+	if json.Unmarshal(metadata.Repository, &repository) != nil {
+		var value struct {
+			URL string `json:"url"`
+		}
+		if json.Unmarshal(metadata.Repository, &value) != nil {
+			return false
+		}
+		repository = value.URL
+	}
+	return repository == "git+https://github.com/agent0ai/spynel.git"
 }
 
 func installationLink(path, root string) bool {
@@ -146,7 +223,7 @@ func installationLink(path, root string) bool {
 	}
 	parent, err := filepath.EvalSymlinks(filepath.Dir(target))
 	resolvedRoot, rootErr := filepath.EvalSymlinks(root)
-	return err == nil && rootErr == nil && parent == resolvedRoot && filepath.Base(target) == "spynel"
+	return err == nil && rootErr == nil && parent == resolvedRoot && filepath.Base(target) == filepath.Base(path)
 }
 
 func installationLauncherDirectories(root, home string) ([]string, error) {
@@ -183,8 +260,10 @@ func (m *Manager) NeedsAdministrator() bool {
 		return true
 	}
 	for _, directory := range paths {
-		if installationLink(filepath.Join(directory, "spynel"), root) && !installationWritable(directory) {
-			return true
+		for _, name := range []string{"iris", "spynel"} {
+			if installationLink(filepath.Join(directory, name), root) && !installationWritable(directory) {
+				return true
+			}
 		}
 	}
 	return false
@@ -193,10 +272,16 @@ func (m *Manager) NeedsAdministrator() bool {
 func (m *Manager) ownsProcessPath(root, path string) bool {
 	path = strings.TrimSuffix(path, " (deleted)")
 	if m.InstallRoot == "" {
-		return npmRootFromExecutable(path) == root
+		name := filepath.Base(path)
+		return (name == "iris" || name == "spynel") && npmRootFromExecutable(path) == root
 	}
+	return standaloneProcessPath(root, path)
+}
+
+func standaloneProcessPath(root, path string) bool {
 	relative, err := filepath.Rel(filepath.Join(root, "releases"), path)
-	return err == nil && filepath.Base(relative) == "spynel" && len(strings.Split(relative, string(filepath.Separator))) == 2 && !strings.HasPrefix(relative, "..")
+	name := filepath.Base(relative)
+	return err == nil && (name == "iris" || name == "spynel") && len(strings.Split(relative, string(filepath.Separator))) == 2 && !strings.HasPrefix(relative, "..")
 }
 
 func (m *Manager) stopProcesses(ctx context.Context, root string) error {

@@ -11,8 +11,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/agent0ai/spynel/internal/agentdocs"
-	"github.com/agent0ai/spynel/internal/instructions"
+	"github.com/edheltzel/iris/internal/agentdocs"
+	"github.com/edheltzel/iris/internal/instructions"
 )
 
 const (

@@ -3,8 +3,8 @@ package tui
 import (
 	"strings"
 
-	"github.com/agent0ai/spynel/internal/channel/tui/textarea"
-	"github.com/agent0ai/spynel/internal/core"
+	"github.com/edheltzel/iris/internal/channel/tui/textarea"
+	"github.com/edheltzel/iris/internal/core"
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/cursor"
 	tea "github.com/charmbracelet/bubbletea"

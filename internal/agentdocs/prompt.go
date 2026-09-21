@@ -14,7 +14,7 @@ const PromptPlaceholder = "{{SPYNEL_DOCS_GUIDANCE}}"
 func PromptGuidance() string {
 	executable, err := os.Executable()
 	if err != nil || !filepath.IsAbs(executable) {
-		executable = "spynel"
+		executable = "iris"
 	}
 	return "When Spynel-specific behavior is missing or may be stale, query `" + promptCommand(executable) + " docs <topic>` and follow its references. Do not query on every turn. Explicit user instructions and the nearest workspace/repository `AGENTS.md` or DOX contract take precedence."
 }

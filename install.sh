@@ -11,7 +11,19 @@ main() {
   esac
   [ "$#" -le 1 ] || { echo 'Usage: install.sh' >&2; exit 2; }
   : "${HOME:?HOME must identify your user directory}"
-  install_root=${SPYNEL_INSTALL_DIR:-"$HOME/.local/share/spynel"}
+  if [ "${SPYNEL_INSTALL_DIR+x}" = x ]; then
+    install_root=$SPYNEL_INSTALL_DIR
+  else
+    install_root="$HOME/.local/share/iris"
+    legacy_root="$HOME/.local/share/spynel"
+    legacy_marker=
+    if [ -f "$legacy_root/.spynel-install" ]; then
+      IFS= read -r legacy_marker < "$legacy_root/.spynel-install" || true
+    fi
+    if [ "$legacy_marker" = spynel-github-v1 ]; then
+      install_root=$legacy_root
+    fi
+  fi
   case "$install_root" in /*) ;; *) echo 'SPYNEL_INSTALL_DIR must be absolute.' >&2; exit 1 ;; esac
   while [ "${install_root%/}" != "$install_root" ] && [ "$install_root" != / ]; do install_root=${install_root%/}; done
   case "$install_root" in *'
@@ -27,12 +39,12 @@ main() {
   case "$(uname -s)" in
     Linux) target_os=linux ;;
     Darwin) target_os=darwin ;;
-    *) echo 'Spynel supports Linux and macOS.' >&2; exit 1 ;;
+    *) echo 'Iris supports Linux and macOS.' >&2; exit 1 ;;
   esac
   case "$(uname -m)" in
     x86_64|amd64) target_arch=amd64 ;;
     aarch64|arm64) target_arch=arm64 ;;
-    *) echo 'Spynel supports amd64 and arm64 processors.' >&2; exit 1 ;;
+    *) echo 'Iris supports amd64 and arm64 processors.' >&2; exit 1 ;;
   esac
   if command -v sha256sum >/dev/null 2>&1; then
     hash_command=sha256sum
@@ -47,32 +59,54 @@ main() {
   case "$install_root" in /*) ;; *) echo 'SPYNEL_INSTALL_DIR must be absolute.' >&2; exit 1 ;; esac
   case "$bin_dir" in /*) ;; *) echo 'SPYNEL_BIN_DIR must be absolute.' >&2; exit 1 ;; esac
   case "$bin_dir" in *:*) echo 'SPYNEL_BIN_DIR cannot contain a PATH separator (:).' >&2; exit 1 ;; esac
+  prior_bin_dir=
   bin_sudo=
   if [ "$uninstalling" = false ]; then
+    bin_record="$install_root/.bin-dir"
+    if [ -f "$bin_record" ] && [ ! -L "$bin_record" ] &&
+       [ "$(wc -c < "$bin_record")" -le 4096 ] && [ "$(wc -l < "$bin_record")" -eq 1 ]; then
+      IFS= read -r prior_bin_dir < "$bin_record" || prior_bin_dir=
+      case "$prior_bin_dir" in /*) ;; *) prior_bin_dir= ;; esac
+      case "$prior_bin_dir" in *:*) prior_bin_dir= ;; esac
+    fi
+    needs_bin_sudo=false
     if ! mkdir -p "$bin_dir" 2>/dev/null || [ ! -w "$bin_dir" ]; then
-      command -v sudo >/dev/null 2>&1 || { echo 'Administrator access is required to install Spynel on PATH; sudo is unavailable.' >&2; exit 1; }
-      echo 'Administrator access is required to install the Spynel command.' >&2
+      needs_bin_sudo=true
+    fi
+    if [ -n "$prior_bin_dir" ] && [ ! -w "$prior_bin_dir" ] &&
+       [ -L "$prior_bin_dir/spynel" ] && [ "$(readlink "$prior_bin_dir/spynel" 2>/dev/null || true)" = "$install_root/spynel" ]; then
+      needs_bin_sudo=true
+    fi
+    if [ "$needs_bin_sudo" = true ]; then
+      command -v sudo >/dev/null 2>&1 || { echo 'Administrator access is required to install Iris on PATH; sudo is unavailable.' >&2; exit 1; }
+      echo 'Administrator access is required to install the Iris command.' >&2
       sudo -v
       sudo mkdir -p "$bin_dir"
       bin_sudo=sudo
     fi
+    if [ -e "$bin_dir/iris" ] || [ -L "$bin_dir/iris" ]; then
+      if [ ! -L "$bin_dir/iris" ] || [ "$(readlink "$bin_dir/iris" 2>/dev/null || true)" != "$install_root/iris" ]; then
+        echo "Preserved the existing $bin_dir/iris. Run: \"$install_root/iris\""
+        return 1
+      fi
+    fi
   fi
-  stage=$(mktemp -d "${TMPDIR:-/tmp}/spynel-install.XXXXXXXX")
+  stage=$(mktemp -d "${TMPDIR:-/tmp}/iris-install.XXXXXXXX")
   trap 'rm -rf "$stage"' 0
   trap 'exit 1' HUP INT TERM
   version=${SPYNEL_VERSION:-}
   if [ -z "$version" ]; then
-    echo 'Finding the latest Spynel release...' >&2
-    latest=$(curl -LsSf --proto '=https' --proto-redir '=https' --connect-timeout 10 --max-time 10 --max-redirs 5 -o /dev/null -w '%{url_effective}' https://github.com/agent0ai/spynel/releases/latest)
+    echo 'Finding the latest Iris release...' >&2
+    latest=$(curl -LsSf --proto '=https' --proto-redir '=https' --connect-timeout 10 --max-time 10 --max-redirs 5 -o /dev/null -w '%{url_effective}' https://github.com/edheltzel/Iris/releases/latest)
     version=${latest##*/v}
   fi
   version=${version#v}
   # Stable releases only; the native installer performs strict semantic validation.
-  case "$version" in ''|*[!0-9.]*|.*|*.) echo 'Unable to select a stable Spynel release.' >&2; exit 1 ;; esac
-  archive="spynel_${version}_${target_os}_${target_arch}.tar.gz"
-  base=${SPYNEL_DOWNLOAD_BASE:-"https://github.com/agent0ai/spynel/releases/download/v$version"}
+  case "$version" in ''|*[!0-9.]*|.*|*.) echo 'Unable to select a stable Iris release.' >&2; exit 1 ;; esac
+  archive="iris_${version}_${target_os}_${target_arch}.tar.gz"
+  base=${SPYNEL_DOWNLOAD_BASE:-"https://github.com/edheltzel/Iris/releases/download/v$version"}
   base=${base%/}
-  echo "Downloading Spynel $version for $target_os/$target_arch..." >&2
+  echo "Downloading Iris $version for $target_os/$target_arch..." >&2
   download "$base/$archive" "$stage/$archive" 536870912
   echo 'Downloading release checksums...' >&2
   download "$base/checksums.txt" "$stage/checksums.txt" 1048576
@@ -92,48 +126,54 @@ main() {
   (ulimit -f 8192; ulimit -t 120; tar -tvzf "$stage/$archive" > "$stage/types")
   awk 'substr($0,1,1) != "-" && substr($0,1,1) != "d" { exit 1 }' "$stage/types" || { echo 'Release archive contains links or special files.' >&2; exit 1; }
   mkdir "$stage/runtime" "$stage/runtime/lib"
-  extract_runtime spynel
+  extract_runtime iris
   case "$target_os" in
     linux) extract_runtime lib/libsherpa-onnx-c-api.so; extract_runtime lib/libonnxruntime.so ;;
     darwin) extract_runtime lib/libsherpa-onnx-c-api.dylib; extract_runtime lib/libonnxruntime.1.27.0.dylib ;;
   esac
-  chmod 700 "$stage/runtime/spynel"
+  chmod 700 "$stage/runtime/iris"
   if [ "$uninstalling" = true ]; then
-    echo 'Uninstalling Spynel...' >&2
-    "$stage/runtime/spynel" uninstall-bundles --root "$install_root"
+    echo 'Uninstalling Iris...' >&2
+    "$stage/runtime/iris" uninstall-bundles --root "$install_root"
     return
   fi
-  echo "Installing Spynel $version..." >&2
-  if ! "$stage/runtime/spynel" install-bundle --root "$install_root" --archive "$stage/$archive" --checksums "$stage/checksums.txt" --version "$version"; then
+  echo "Installing Iris $version..." >&2
+  if ! "$stage/runtime/iris" install-bundle --root "$install_root" --archive "$stage/$archive" --checksums "$stage/checksums.txt" --version "$version"; then
     echo 'Installation failed. Use a release with standalone installer support; the prior bundle is retained.' >&2
     exit 1
   fi
-  if $bin_sudo ln -s "$install_root/spynel" "$bin_dir/spynel" 2>/dev/null; then
+  if $bin_sudo ln -s "$install_root/iris" "$bin_dir/iris" 2>/dev/null; then
     :
-  elif [ ! -e "$bin_dir/spynel" ] && [ ! -L "$bin_dir/spynel" ]; then
+  elif [ ! -e "$bin_dir/iris" ] && [ ! -L "$bin_dir/iris" ]; then
     echo "Cannot create the launcher in $bin_dir; check directory permissions." >&2
     exit 1
-  elif [ "$(readlink "$bin_dir/spynel" 2>/dev/null || true)" != "$install_root/spynel" ]; then
-    echo "Preserved the existing $bin_dir/spynel. Run: \"$install_root/spynel\""
+  elif [ "$(readlink "$bin_dir/iris" 2>/dev/null || true)" != "$install_root/iris" ]; then
+    echo "Preserved the existing $bin_dir/iris. Run: \"$install_root/iris\""
     return 1
   fi
+  for directory in "$bin_dir" "$prior_bin_dir"; do
+    if [ -n "$directory" ] && [ -L "$directory/spynel" ] &&
+       [ "$(readlink "$directory/spynel" 2>/dev/null || true)" = "$install_root/spynel" ]; then
+      $bin_sudo rm -f "$directory/spynel"
+    fi
+  done
   printf '%s\n' "$bin_dir" > "$install_root/.bin-dir"
   quoted_bin=$(shell_quote "$bin_dir")
-  path_line="case \":\$PATH:\" in *:$quoted_bin:*) ;; *) export PATH=$quoted_bin:\$PATH ;; esac # Spynel installer"
+  path_line="case \":\$PATH:\" in *:$quoted_bin:*) ;; *) export PATH=$quoted_bin:\$PATH ;; esac # Iris installer"
   printf '%s\n' "$path_line" > "$install_root/env"
   if on_path "$bin_dir"; then
-    [ "$(spynel --version)" = "spynel $version" ] || { echo 'The installed Spynel command could not be verified on PATH.' >&2; exit 1; }
-    echo "Installed Spynel $version. Run: spynel"
+    [ "$(iris --version)" = "iris $version" ] || { echo 'The installed Iris command could not be verified on PATH.' >&2; exit 1; }
+    echo "Installed Iris $version. Run: iris"
   else
     configure_path
-    echo "Installed Spynel $version. PATH configured for your shell."
+    echo "Installed Iris $version. PATH configured for your shell."
     # A piped child cannot change its parent's environment. Show a command
     # usable immediately when no writable directory was already on PATH.
-    printf 'Run now: %s\n' "$(shell_quote "$bin_dir/spynel")"
+    printf 'Run now: %s\n' "$(shell_quote "$bin_dir/iris")"
   fi
-  resolved=$(command -v spynel || true)
-  if [ -n "$resolved" ] && [ "$resolved" != "$bin_dir/spynel" ]; then
-    echo "Your PATH currently selects $resolved. Use \"$bin_dir/spynel\" for this installation."
+  resolved=$(command -v iris || true)
+  if [ -n "$resolved" ] && [ "$resolved" != "$bin_dir/iris" ]; then
+    echo "Your PATH currently selects $resolved. Use \"$bin_dir/iris\" for this installation."
   fi
 }
 
@@ -173,7 +213,7 @@ default_bin_dir() {
     remaining_path=${remaining_path#*:}
     case "$directory" in /*) printf '%s\n' "$directory"; return ;; esac
   done
-  echo 'PATH has no absolute directory for the Spynel command.' >&2
+  echo 'PATH has no absolute directory for the Iris command.' >&2
   return 1
 }
 

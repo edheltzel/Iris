@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -51,7 +52,7 @@ func TestLifecycleProcessFixture(t *testing.T) {
 
 func lifecycleFixture(t *testing.T, installation string) *exec.Cmd {
 	t.Helper()
-	binary := filepath.Join(installation, "releases", filepath.Base(t.TempDir()), "spynel")
+	binary := filepath.Join(installation, "releases", filepath.Base(t.TempDir()), "iris")
 	uninstallFixtureBinary(t, binary)
 	command := exec.Command(binary, "-test.run=^TestLifecycleProcessFixture$")
 	command.Dir = t.TempDir()
@@ -71,6 +72,59 @@ func lifecycleFixture(t *testing.T, installation string) *exec.Cmd {
 		t.Fatalf("fixture startup: %q %v", ready, err)
 	}
 	return command
+}
+
+func TestProcessDirectoryUsesIdentityMigrationBoundary(t *testing.T) {
+	t.Run("rejects dual tokens", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+		config, err := os.UserConfigDir()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range []string{"iris", "spynel"} {
+			directory := filepath.Join(config, name)
+			if err := os.MkdirAll(directory, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(directory, "environment-token"), []byte(name), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := processDirectory(); err == nil || !strings.Contains(err.Error(), "both legacy environment identity sources contain tokens") {
+			t.Fatalf("dual-token process directory error = %v", err)
+		}
+		if _, err := os.Stat(filepath.Join(home, ".agents", "Iris", "processes")); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("process directory unexpectedly created: %v", err)
+		}
+	})
+
+	t.Run("migrates spynel first", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+		config, err := os.UserConfigDir()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for name, content := range map[string]string{"iris": "iris", "spynel": "spynel"} {
+			directory := filepath.Join(config, name)
+			if err := os.MkdirAll(directory, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(directory, "shared"), []byte(content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := processDirectory(); err == nil || !strings.Contains(err.Error(), "migration entry conflicts") {
+			t.Fatalf("tokenless migration error = %v", err)
+		}
+		data, err := os.ReadFile(filepath.Join(home, ".agents", "Iris", "shared"))
+		if err != nil || string(data) != "spynel" {
+			t.Fatalf("tokenless migration winner = %q, %v", data, err)
+		}
+	})
 }
 
 func TestRestartAllWorkspacesAndStopAllInstallations(t *testing.T) {
@@ -160,6 +214,110 @@ func TestProcessRecordCannotTargetAnUnrelatedExecutable(t *testing.T) {
 	}
 }
 
+func TestLegacyProcessIsStopOnlyAndInstallationOwned(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle := filepath.Join(root, "releases", "legacy")
+	if err := os.MkdirAll(bundle, 0700); err != nil {
+		t.Fatal(err)
+	}
+	marker, _ := json.Marshal(bundleMetadata{Version: "0.12.1", OS: runtime.GOOS, Arch: runtime.GOARCH})
+	if err := os.WriteFile(filepath.Join(root, ".spynel-install"), []byte(ownershipMarker), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(bundle, ".bundle.json"), append(marker, '\n'), 0600); err != nil {
+		t.Fatal(err)
+	}
+	source := t.TempDir()
+	if err := os.WriteFile(filepath.Join(source, "go.mod"), []byte("module github.com/agent0ai/spynel\n\ngo 1.25.0\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	program := `package main
+import ("fmt"; "os"; "os/signal"; "syscall")
+func main() { signals := make(chan os.Signal, 1); signal.Notify(signals, syscall.SIGTERM); fmt.Println("ready"); <-signals }
+`
+	if err := os.WriteFile(filepath.Join(source, "main.go"), []byte(program), 0600); err != nil {
+		t.Fatal(err)
+	}
+	legacyBinary := filepath.Join(bundle, "spynel")
+	build := exec.Command("go", "build", "-o", legacyBinary, ".")
+	build.Dir = source
+	build.Env = append(os.Environ(), "GOWORK=off")
+	if output, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build legacy process fixture: %v: %s", err, output)
+	}
+	unmanagedRoot, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	unmanagedBinary := filepath.Join(unmanagedRoot, "spynel")
+	data, err := os.ReadFile(legacyBinary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(unmanagedBinary, data, 0700); err != nil {
+		t.Fatal(err)
+	}
+	start := func(path string) *exec.Cmd {
+		t.Helper()
+		command := exec.Command(path)
+		stdout, err := command.StdoutPipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := command.Start(); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = command.Process.Kill(); _ = command.Wait() })
+		ready, err := bufio.NewReader(stdout).ReadString('\n')
+		if err != nil || ready != "ready\n" {
+			t.Fatalf("legacy process fixture startup: %q %v", ready, err)
+		}
+		return command
+	}
+	owned, unmanaged := start(legacyBinary), start(unmanagedBinary)
+	directory, err := processDirectory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for command, installation := range map[*exec.Cmd]string{owned: root, unmanaged: unmanagedRoot} {
+		executable, err := installationProcessPath(command.Process.Pid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		record := ProcessRegistration{PID: command.Process.Pid, Generation: "0123456789abcdef0123456789abcdef", Executable: executable, Installation: installation, Version: "0.12.1"}
+		data, _ := json.Marshal(record)
+		path := filepath.Join(directory, strconv.Itoa(record.PID)+".json")
+		if err := os.WriteFile(path, data, 0600); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Remove(path) })
+	}
+	if err := (&Manager{InstallRoot: root}).CheckRestartable(); err == nil || !strings.Contains(err.Error(), "iris killall") {
+		t.Fatalf("legacy restart preflight: %v", err)
+	}
+	if err := owned.Process.Signal(syscall.Signal(0)); err != nil {
+		t.Fatal("legacy restart preflight stopped the process")
+	}
+	stop := errors.New("stop after discovery")
+	if _, err := KillAll(t.Context(), func(records []ProcessRegistration) error {
+		found := make(map[int]bool)
+		for _, record := range records {
+			found[record.PID] = true
+		}
+		if !found[owned.Process.Pid] || found[unmanaged.Process.Pid] {
+			t.Fatalf("legacy discovery = %#v", found)
+		}
+		return stop
+	}); !errors.Is(err, stop) {
+		t.Fatalf("killall legacy discovery: %v", err)
+	}
+}
+
 func TestRestartRejectsLegacyProcessBeforeSignaling(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("HOME", t.TempDir())
@@ -189,7 +347,7 @@ func TestRestartRejectsLegacyProcessBeforeSignaling(t *testing.T) {
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
-	if err := manager.CheckRestartable(); err == nil || !strings.Contains(err.Error(), "spynel killall") {
+	if err := manager.CheckRestartable(); err == nil || !strings.Contains(err.Error(), "iris killall") {
 		t.Fatalf("legacy preflight: %v", err)
 	}
 	if err := process.Process.Signal(syscall.Signal(0)); err != nil {

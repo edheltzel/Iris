@@ -3,17 +3,33 @@ set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 project_dir=$(CDPATH= cd -- "$script_dir/.." && pwd)
-binary="$project_dir/.tmp-bin/spynel"
+binary="$project_dir/.tmp-bin/iris"
 
 "$script_dir/dev.sh" dox
 "$script_dir/dev.sh" build >/dev/null
-smoke_dir=$(mktemp -d "${TMPDIR:-/tmp}/spynel-smoke.XXXXXX")
-trap 'rm -rf "$smoke_dir"' EXIT HUP INT TERM
+# Host Go caches, captured before HOME isolation. Defaults write 0444 modules under $HOME/go.
+gopath=$(go env GOPATH)
+gocache=$(go env GOCACHE)
+gomodcache=$(go env GOMODCACHE)
+smoke_dir=$(mktemp -d "${TMPDIR:-/tmp}/iris-smoke.XXXXXX")
+trap 'chmod -R u+w "$smoke_dir" && rm -rf "$smoke_dir"' EXIT HUP INT TERM
+HOME="$smoke_dir/home"
+XDG_CONFIG_HOME="$HOME/.config"
+XDG_CACHE_HOME="$HOME/.cache"
+export HOME XDG_CONFIG_HOME XDG_CACHE_HOME
+export GOPATH="$gopath" GOCACHE="$gocache" GOMODCACHE="$gomodcache"
+mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME"
 
 dev_bin_dir="$smoke_dir/user bin"
-SPYNEL_DEV_BIN_DIR="$dev_bin_dir" "$script_dir/install-dev.sh" >/dev/null
-test -x "$dev_bin_dir/spynel"
-"$dev_bin_dir/spynel" version >/dev/null
+other_bin_dir="$smoke_dir/other bin"
+mkdir -p "$dev_bin_dir" "$other_bin_dir"
+ln -s "$binary" "$dev_bin_dir/spynel"
+printf 'unrelated command\n' > "$other_bin_dir/spynel"
+PATH="$other_bin_dir:$PATH" SPYNEL_DEV_BIN_DIR="$dev_bin_dir" "$script_dir/install-dev.sh" >/dev/null
+test -x "$dev_bin_dir/iris"
+test ! -e "$dev_bin_dir/spynel"
+test "$(cat "$other_bin_dir/spynel")" = 'unrelated command'
+"$dev_bin_dir/iris" version >/dev/null
 
 docs_index=$(cd "$smoke_dir" && "$binary" docs)
 printf '%s\n' "$docs_index" | grep -q '`goals`'
@@ -105,4 +121,5 @@ for status in proposed planning active review reviewing waiting done abandoned; 
   test -d "$smoke_dir/.spynel/goals/$status"
 done
 
+test ! -e "$HOME/go"
 echo "Spynel smoke test passed: $smoke_dir"

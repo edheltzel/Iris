@@ -15,8 +15,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/agent0ai/spynel/internal/core"
-	"github.com/agent0ai/spynel/internal/fsx"
+	"github.com/edheltzel/iris/internal/core"
+	"github.com/edheltzel/iris/internal/fsx"
 )
 
 type CodexConfig struct {

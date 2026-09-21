@@ -1,8 +1,8 @@
-# Spynel Command Package DOX
+# Iris Command Package DOX
 
 ## Purpose
 
-- Own process entry-point wiring for the `spynel` executable.
+- Own process entry-point wiring for the `iris` executable.
 
 ## Local Contracts
 

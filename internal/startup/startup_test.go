@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/config"
-	"github.com/agent0ai/spynel/internal/instance"
+	"github.com/edheltzel/iris/internal/config"
+	"github.com/edheltzel/iris/internal/instance"
 )
 
 func TestStartupCommandHelper(t *testing.T) {

@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/core"
-	"github.com/agent0ai/spynel/internal/history"
+	"github.com/edheltzel/iris/internal/core"
+	"github.com/edheltzel/iris/internal/history"
 )
 
 func TestConversationSubscriptionSendNotifyReconnectAndRestart(t *testing.T) {

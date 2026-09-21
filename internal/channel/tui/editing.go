@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/channel/tui/textarea"
-	"github.com/agent0ai/spynel/internal/markdown"
+	"github.com/edheltzel/iris/internal/channel/tui/textarea"
+	"github.com/edheltzel/iris/internal/markdown"
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"

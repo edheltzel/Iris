@@ -19,9 +19,9 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/agent0ai/spynel/internal/config"
-	"github.com/agent0ai/spynel/internal/fsx"
-	"github.com/agent0ai/spynel/internal/updater"
+	"github.com/edheltzel/iris/internal/config"
+	"github.com/edheltzel/iris/internal/fsx"
+	"github.com/edheltzel/iris/internal/updater"
 )
 
 type CommandRunner func(context.Context, string, ...string) (string, error)

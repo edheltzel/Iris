@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/app"
-	"github.com/agent0ai/spynel/internal/core"
+	"github.com/edheltzel/iris/internal/app"
+	"github.com/edheltzel/iris/internal/core"
 )
 
 func TestPublishTUIStateChangesCarriesLatestDurableCounts(t *testing.T) {

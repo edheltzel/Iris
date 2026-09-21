@@ -9,8 +9,8 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/app"
-	"github.com/agent0ai/spynel/internal/history"
+	"github.com/edheltzel/iris/internal/app"
+	"github.com/edheltzel/iris/internal/history"
 )
 
 const maxSubscribers = 32

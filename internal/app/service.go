@@ -13,21 +13,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/agentdocs"
-	"github.com/agent0ai/spynel/internal/channel"
-	"github.com/agent0ai/spynel/internal/channel/telegram"
-	"github.com/agent0ai/spynel/internal/config"
-	"github.com/agent0ai/spynel/internal/core"
-	"github.com/agent0ai/spynel/internal/extensions"
-	"github.com/agent0ai/spynel/internal/fsx"
-	"github.com/agent0ai/spynel/internal/harness"
-	"github.com/agent0ai/spynel/internal/history"
-	"github.com/agent0ai/spynel/internal/instructions"
-	"github.com/agent0ai/spynel/internal/media"
-	"github.com/agent0ai/spynel/internal/orchestrator"
-	"github.com/agent0ai/spynel/internal/shortid"
-	"github.com/agent0ai/spynel/internal/theme"
-	"github.com/agent0ai/spynel/internal/updater"
+	"github.com/edheltzel/iris/internal/agentdocs"
+	"github.com/edheltzel/iris/internal/channel"
+	"github.com/edheltzel/iris/internal/channel/telegram"
+	"github.com/edheltzel/iris/internal/config"
+	"github.com/edheltzel/iris/internal/core"
+	"github.com/edheltzel/iris/internal/extensions"
+	"github.com/edheltzel/iris/internal/fsx"
+	"github.com/edheltzel/iris/internal/harness"
+	"github.com/edheltzel/iris/internal/history"
+	"github.com/edheltzel/iris/internal/instructions"
+	"github.com/edheltzel/iris/internal/media"
+	"github.com/edheltzel/iris/internal/orchestrator"
+	"github.com/edheltzel/iris/internal/shortid"
+	"github.com/edheltzel/iris/internal/theme"
+	"github.com/edheltzel/iris/internal/updater"
 )
 
 type Service struct {
@@ -1954,7 +1954,7 @@ var helpTopics = []struct {
 	{
 		name:        "channels",
 		description: "The TUI, Telegram, and WhatsApp",
-		body:        "# Channels\n\nThe TUI, each Telegram chat, and each WhatsApp chat keep independent durable histories and harness threads. All channels share the application slash commands and Markdown-aware responses.\n\nUse `/status` to inspect shared connection, runtime, harness, instance, and orchestrator indicators. From an idle local TUI, `/primary` safely hands workspace ownership to that TUI instance. Use `/history` to locate the current conversation's history file, `/clear` to erase that history and discard its harness thread, `/stop` to interrupt its active execution, and `/new` to switch the TUI to a distinct conversation while preserving the prior one for `/resume`. `/restart` acknowledges the request, cleanly stops the current runtime, and relaunches Spynel with saved configuration and histories intact. `/update` updates the owning installation and restarts all its running instances across workspaces. `/update check` only checks versions, with a ten-second deadline. The shell command `spynel killall` stops all running Spynel instances, preserving saved workspace state and future autostart registrations. `/log` shows bounded runtime diagnostics. `/jobs` lists active executions and `/jobs recent` lists archived executions by the same numeric reference; `/job info <number>` and `/job output <number>` inspect bounded metadata or captured output. `/tasks` and `/goals` list open durable work by default. `/job message <number> <text>` sends nonterminal guidance through the existing job session, `/job ping <number>` requests a durable progress update, and `/job kill <number>` stops one live job.",
+		body:        "# Channels\n\nThe TUI, each Telegram chat, and each WhatsApp chat keep independent durable histories and harness threads. All channels share the application slash commands and Markdown-aware responses.\n\nUse `/status` to inspect shared connection, runtime, harness, instance, and orchestrator indicators. From an idle local TUI, `/primary` safely hands workspace ownership to that TUI instance. Use `/history` to locate the current conversation's history file, `/clear` to erase that history and discard its harness thread, `/stop` to interrupt its active execution, and `/new` to switch the TUI to a distinct conversation while preserving the prior one for `/resume`. `/restart` acknowledges the request, cleanly stops the current runtime, and relaunches Spynel with saved configuration and histories intact. `/update` updates the owning installation and restarts all its running instances across workspaces. `/update check` only checks versions, with a ten-second deadline. The shell command `iris killall` stops all running Spynel instances, preserving saved workspace state and future autostart registrations. `/log` shows bounded runtime diagnostics. `/jobs` lists active executions and `/jobs recent` lists archived executions by the same numeric reference; `/job info <number>` and `/job output <number>` inspect bounded metadata or captured output. `/tasks` and `/goals` list open durable work by default. `/job message <number> <text>` sends nonterminal guidance through the existing job session, `/job ping <number>` requests a durable progress update, and `/job kill <number>` stops one live job.",
 	},
 	{
 		name:        "workflows",

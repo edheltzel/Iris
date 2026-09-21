@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/core"
+	"github.com/edheltzel/iris/internal/core"
 )
 
 const (

@@ -8,10 +8,10 @@ const stream = require("stream");
 const { spawn, spawnSync } = require("child_process");
 const { once } = require("events");
 const { resolve } = require("./platform");
-const { install, validateArchiveEntries, validateExtractedTree } = require("./install");
+const { cleanupUserID, install, validateArchiveEntries, validateExtractedTree } = require("./install");
 const { prepareRelease, releaseMetadata, rewriteReadme } = require("./prepare-release");
-const { STARTUP_PROMPT_TIMEOUT_MS, checkForUpdate, compareVersions, promptForStartupUpdate, shouldCheckAtStartup } = require("./update");
-const { createLaunchEnvironment } = require("./bin/spynel");
+const { STARTUP_PROMPT_TIMEOUT_MS, checkForUpdate, compareVersions, npmInvocation, promptForStartupUpdate, shouldCheckAtStartup } = require("./update");
+const { createLaunchEnvironment } = require("./bin/iris");
 const pkg = require("../package.json");
 
 const staleSnapshot = {
@@ -41,12 +41,14 @@ assert.throws(() => resolve("win32", "x64"), /does not currently support Windows
 assert.throws(() => resolve("win32", "arm64"), /does not currently support Windows/);
 assert.throws(() => resolve("freebsd", "x64"), /does not publish/);
 
-assert.strictEqual(pkg.name, "spynel");
+assert.strictEqual(pkg.name, "@edheltzel/iris");
 assert.strictEqual(pkg.description, "A non-AI orchestration layer connecting one human to many coding agents");
-assert.strictEqual(pkg.bin.spynel, "npm/bin/spynel.js");
+assert.strictEqual(pkg.bin.iris, "npm/bin/iris.js");
 assert.strictEqual(pkg.publishConfig.registry, "https://registry.npmjs.org");
-assert.strictEqual(pkg.repository.url, "git+https://github.com/agent0ai/spynel.git");
-assert(fs.readFileSync(path.join(__dirname, "install.js"), "utf8").includes("https://github.com/agent0ai/spynel/releases/download/"));
+assert.strictEqual(pkg.repository.url, "git+https://github.com/edheltzel/Iris.git");
+assert.strictEqual(cleanupUserID(0, "501"), 501);
+assert.strictEqual(cleanupUserID(0, "0501"), 0);
+assert.strictEqual(cleanupUserID(502, "501"), 502);
 assert.deepStrictEqual(releaseMetadata("v1.2.3-beta.1", "true"), {
   tag: "v1.2.3-beta.1",
   version: "1.2.3-beta.1",
@@ -59,46 +61,50 @@ assert.strictEqual(
     "![Logo](assets/logo.png) [Guide](docs/guide.md) [Section](#section) <img src=\"./assets/demo image.png\">\n",
     "v1.2.3",
   ),
-  "![Logo](https://raw.githubusercontent.com/agent0ai/spynel/v1.2.3/assets/logo.png) " +
-    "[Guide](https://github.com/agent0ai/spynel/blob/v1.2.3/docs/guide.md) [Section](#section) " +
-    "<img src=\"https://raw.githubusercontent.com/agent0ai/spynel/v1.2.3/assets/demo%20image.png\">\n",
+  "![Logo](https://raw.githubusercontent.com/edheltzel/Iris/v1.2.3/assets/logo.png) " +
+    "[Guide](https://github.com/edheltzel/Iris/blob/v1.2.3/docs/guide.md) [Section](#section) " +
+    "<img src=\"https://raw.githubusercontent.com/edheltzel/Iris/v1.2.3/assets/demo%20image.png\">\n",
 );
 const prepared = fs.mkdtempSync(path.join(__dirname, ".test-release-"));
 try {
-  fs.writeFileSync(path.join(prepared, "package.json"), '{"name":"spynel","version":"0.0.0-development"}\n');
+  fs.writeFileSync(path.join(prepared, "package.json"), '{"name":"@edheltzel/iris","version":"0.0.0-development"}\n');
   fs.writeFileSync(path.join(prepared, "README.md"), "[Docs](docs/README.md)\n");
   assert.strictEqual(prepareRelease(prepared, "v2.0.0", "false").version, "2.0.0");
   assert.strictEqual(JSON.parse(fs.readFileSync(path.join(prepared, "package.json"), "utf8")).version, "2.0.0");
   assert.strictEqual(
     fs.readFileSync(path.join(prepared, "README.md"), "utf8"),
-    "[Docs](https://github.com/agent0ai/spynel/blob/v2.0.0/docs/README.md)\n",
+    "[Docs](https://github.com/edheltzel/Iris/blob/v2.0.0/docs/README.md)\n",
   );
 } finally {
   fs.rmSync(prepared, { recursive: true, force: true });
 }
-assert.doesNotThrow(() => validateArchiveEntries(["./spynel", "./lib/runtime.so", "licenses/miniaudio/LICENSE"]));
+assert.doesNotThrow(() => validateArchiveEntries(["./iris", "./lib/runtime.so", "licenses/miniaudio/LICENSE"]));
 assert.throws(() => validateArchiveEntries(["../../outside"]), /escapes/);
-assert.throws(() => validateArchiveEntries(["C:\\outside\\spynel.exe"]), /absolute/);
+assert.throws(() => validateArchiveEntries(["C:\\outside\\iris.exe"]), /absolute/);
 assert.throws(() => validateArchiveEntries(["safe\nunsafe"]), /control/);
 const extracted = fs.mkdtempSync(path.join(__dirname, ".test-extracted-"));
 try {
   fs.mkdirSync(path.join(extracted, "lib"));
-  fs.writeFileSync(path.join(extracted, "spynel"), "binary");
+  fs.writeFileSync(path.join(extracted, "iris"), "binary");
   fs.writeFileSync(path.join(extracted, "lib", "runtime.so"), "library");
   assert.doesNotThrow(() => validateExtractedTree(extracted));
   if (process.platform !== "win32") {
-    fs.symlinkSync(path.join(extracted, "spynel"), path.join(extracted, "link"));
+    fs.symlinkSync(path.join(extracted, "iris"), path.join(extracted, "link"));
     assert.throws(() => validateExtractedTree(extracted), /symbolic link/);
   }
 } finally {
   fs.rmSync(extracted, { recursive: true, force: true });
 }
-for (const required of ["bin/spynel.js", "install.js", "platform.js", "update.js"]) {
+for (const required of ["bin/iris.js", "install.js", "platform.js", "update.js"]) {
   assert(fs.existsSync(path.join(__dirname, required)), `npm package is missing ${required}`);
 }
 assert(compareVersions("1.3.0", "1.2.9") > 0);
 assert(compareVersions("1.0.0", "1.0.0-rc.1") > 0);
 assert(compareVersions("1.0.0-beta.2", "1.0.0-beta.11") < 0);
+assert.deepStrictEqual(
+  npmInvocation(path.join(__dirname, ".test-project", "node_modules", "@edheltzel", "iris")).args,
+  ["update", "@edheltzel/iris", "--prefix", path.join(__dirname, ".test-project")],
+);
 assert.strictEqual(shouldCheckAtStartup(["serve", "--automatic-startup"], { isTTY: true }, { isTTY: true }, {}), false);
 assert.strictEqual(shouldCheckAtStartup(["version"], { isTTY: true }, { isTTY: true }, {}), false);
 assert.strictEqual(shouldCheckAtStartup([], { isTTY: true }, { isTTY: true }, {}), true);
@@ -118,16 +124,16 @@ async function close(server) {
 }
 
 async function checkLauncherSignals() {
-  const directory = fs.mkdtempSync(path.join(require("os").tmpdir(), "spynel-launcher-"));
+  const directory = fs.mkdtempSync(path.join(require("os").tmpdir(), "iris-launcher-"));
   try {
     fs.mkdirSync(path.join(directory, "npm", "bin"), { recursive: true });
     fs.mkdirSync(path.join(directory, "npm", "vendor"));
-    for (const file of ["bin/spynel.js", "platform.js", "update.js"]) {
+    for (const file of ["bin/iris.js", "platform.js", "update.js"]) {
       fs.copyFileSync(path.join(__dirname, file), path.join(directory, "npm", file));
     }
     fs.copyFileSync(path.join(__dirname, "..", "package.json"), path.join(directory, "package.json"));
     const marker = path.join(directory, "stopped");
-    fs.writeFileSync(path.join(directory, "npm", "vendor", "spynel"), `#!/usr/bin/env node
+    fs.writeFileSync(path.join(directory, "npm", "vendor", "iris"), `#!/usr/bin/env node
 for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(signal, () => {
   setTimeout(() => { require("fs").writeFileSync(${JSON.stringify(marker)}, signal); process.exit(0); }, 30);
 });
@@ -135,7 +141,7 @@ console.log(process.pid);
 setInterval(() => {}, 1000);
 `, { mode: 0o700 });
     for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
-      const launcher = spawn(process.execPath, [path.join(directory, "npm", "bin", "spynel.js"), "serve"], { stdio: ["ignore", "pipe", "pipe"] });
+      const launcher = spawn(process.execPath, [path.join(directory, "npm", "bin", "iris.js"), "serve"], { stdio: ["ignore", "pipe", "pipe"] });
       let nativePID;
       const exited = once(launcher, "exit");
       const timeout = setTimeout(() => launcher.kill("SIGKILL"), 3000);
@@ -160,12 +166,12 @@ setInterval(() => {}, 1000);
 }
 
 function checkLauncherUpdates() {
-  const directory = fs.mkdtempSync(path.join(require("os").tmpdir(), "spynel-update-"));
+  const directory = fs.mkdtempSync(path.join(require("os").tmpdir(), "iris-update-"));
   try {
     fs.mkdirSync(path.join(directory, "npm", "bin"), { recursive: true });
     fs.mkdirSync(path.join(directory, "npm", "vendor"));
     fs.mkdirSync(path.join(directory, "tools"));
-    for (const file of ["bin/spynel.js", "platform.js", "update.js"]) {
+    for (const file of ["bin/iris.js", "platform.js", "update.js"]) {
       fs.copyFileSync(path.join(__dirname, file), path.join(directory, "npm", file));
     }
     const native = `#!${process.execPath}
@@ -178,19 +184,19 @@ if (action === "update") {
   process.exit(75);
 }
 `;
-    fs.writeFileSync(path.join(directory, "npm", "vendor", "spynel"), native, { mode: 0o700 });
+    fs.writeFileSync(path.join(directory, "npm", "vendor", "iris"), native, { mode: 0o700 });
     fs.writeFileSync(path.join(directory, "tools", "npm"), `#!${process.execPath}
 const fs = require("fs");
 if (process.argv[2] === "root") process.exit(1);
 fs.appendFileSync(process.env.UPDATE_TEST_LOG, "npm\\n");
 if (process.env.UPDATE_TEST_FAIL === "npm") process.exit(1);
-fs.writeFileSync("package.json", JSON.stringify({name: "spynel", version: "2.0.0"}));
+fs.writeFileSync("package.json", JSON.stringify({name: "@edheltzel/iris", version: "2.0.0"}));
 `, { mode: 0o700 });
     for (const failure of ["", "check-restartable", "npm", "restart-instances", "current"]) {
       const log = path.join(directory, "calls");
       fs.writeFileSync(log, "");
-      fs.writeFileSync(path.join(directory, "package.json"), JSON.stringify({ name: "spynel", version: "1.0.0" }));
-      const result = spawnSync(process.execPath, [path.join(directory, "npm", "bin", "spynel.js"), "update"], {
+      fs.writeFileSync(path.join(directory, "package.json"), JSON.stringify({ name: "@edheltzel/iris", version: "1.0.0" }));
+      const result = spawnSync(process.execPath, [path.join(directory, "npm", "bin", "iris.js"), "update"], {
         encoding: "utf8", timeout: 5000,
         env: { ...process.env, PATH: path.join(directory, "tools") + path.delimiter + process.env.PATH, UPDATE_TEST_LOG: log, UPDATE_TEST_FAIL: failure, UPDATE_TEST_CURRENT: failure === "current" ? "1" : "0" }
       });
@@ -205,7 +211,94 @@ fs.writeFileSync("package.json", JSON.stringify({name: "spynel", version: "2.0.0
   }
 }
 
+function checkLegacyGlobalCleanup() {
+  const directory = fs.mkdtempSync(path.join(require("os").tmpdir(), "iris-legacy-npm-"));
+  try {
+    const globalRoot = path.join(directory, "lib", "node_modules");
+    const packageRoot = path.join(globalRoot, "@edheltzel", "iris");
+    const npmDirectory = path.join(packageRoot, "npm");
+    const vendor = path.join(npmDirectory, "vendor");
+    const legacyRoot = path.join(globalRoot, "spynel");
+    const tools = path.join(directory, "tools");
+    const log = path.join(directory, "calls");
+    fs.mkdirSync(vendor, { recursive: true });
+    fs.mkdirSync(legacyRoot, { recursive: true });
+    fs.mkdirSync(tools);
+    for (const file of ["install.js", "platform.js"]) {
+      fs.copyFileSync(path.join(__dirname, file), path.join(npmDirectory, file));
+    }
+    fs.copyFileSync(path.join(__dirname, "..", "package.json"), path.join(packageRoot, "package.json"));
+    const target = resolve(process.platform, process.arch);
+    fs.writeFileSync(path.join(vendor, "iris"), `#!${process.execPath}
+const fs = require("fs");
+fs.appendFileSync(process.env.LEGACY_NPM_LOG, process.argv.slice(2).join(" ") + "\\n");
+if (process.env.LEGACY_CLEANUP_FAIL === "1") process.exitCode = 3;
+`, { mode: 0o700 });
+    fs.writeFileSync(path.join(vendor, ".installed.json"), JSON.stringify({ version: pkg.version, os: target.os, arch: target.arch }));
+    fs.writeFileSync(path.join(tools, "npm"), `#!${process.execPath}
+const fs = require("fs");
+const args = process.argv.slice(2);
+fs.appendFileSync(process.env.LEGACY_NPM_LOG, args.join(" ") + "\\n");
+if (args.join(" ") === "root --global") {
+  console.log(process.env.LEGACY_NPM_ROOT);
+} else if (args.join(" ") === "uninstall --global spynel") {
+  const calls = fs.readFileSync(process.env.LEGACY_NPM_LOG, "utf8");
+  if (!calls.includes("cleanup-legacy-npm --root " + process.env.LEGACY_NPM_PACKAGE + " --user-id " + process.env.LEGACY_NPM_USER_ID + "\\n")) process.exit(3);
+  fs.rmSync(process.env.LEGACY_NPM_PACKAGE, {recursive: true, force: true});
+} else {
+  process.exitCode = 2;
+}
+`, { mode: 0o700 });
+    const environment = {
+      ...process.env,
+      PATH: tools + path.delimiter + process.env.PATH,
+      LEGACY_NPM_LOG: log,
+      LEGACY_NPM_ROOT: globalRoot,
+      LEGACY_NPM_PACKAGE: legacyRoot,
+      LEGACY_NPM_USER_ID: String(process.getuid()),
+    };
+    const runInstall = () => spawnSync(process.execPath, [path.join(npmDirectory, "install.js")], {
+      cwd: packageRoot,
+      encoding: "utf8",
+      env: environment,
+    });
+
+    fs.writeFileSync(path.join(legacyRoot, "package.json"), JSON.stringify({
+      name: "spynel",
+      version: "0.12.2",
+      repository: { type: "git", url: "git+https://github.com/agent0ai/spynel.git" },
+      bin: { spynel: "npm/bin/spynel.js" },
+    }));
+    fs.mkdirSync(path.join(legacyRoot, "npm", "vendor"), { recursive: true });
+    fs.writeFileSync(path.join(legacyRoot, "npm", "vendor", ".installed.json"), JSON.stringify({ version: "0.12.2" }));
+    let result = runInstall();
+    assert.ifError(result.error);
+    assert.strictEqual(result.status, 0, result.stderr);
+    assert.strictEqual(fs.existsSync(legacyRoot), false);
+    assert.strictEqual(
+      fs.readFileSync(log, "utf8"),
+      `root --global\ncleanup-legacy-npm --root ${legacyRoot} --user-id ${process.getuid()}\nuninstall --global spynel\n`,
+    );
+
+    fs.mkdirSync(legacyRoot);
+    fs.writeFileSync(path.join(legacyRoot, "package.json"), JSON.stringify({
+      name: "spynel",
+      repository: { type: "git", url: "https://example.com/unrelated.git" },
+      bin: { spynel: "npm/bin/spynel.js" },
+    }));
+    fs.writeFileSync(log, "");
+    result = runInstall();
+    assert.ifError(result.error);
+    assert.strictEqual(result.status, 0, result.stderr);
+    assert.strictEqual(fs.existsSync(legacyRoot), true);
+    assert.strictEqual(fs.readFileSync(log, "utf8"), "root --global\n");
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+}
+
 async function main() {
+  checkLegacyGlobalCleanup();
   checkLauncherUpdates();
   await checkLauncherSignals();
   const platformDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
@@ -218,7 +311,7 @@ async function main() {
 
   const registry = http.createServer((_, response) => {
     response.setHeader("content-type", "application/json");
-    response.end(JSON.stringify({ name: "spynel", version: "0.3.0" }));
+    response.end(JSON.stringify({ name: "@edheltzel/iris", version: "0.3.0" }));
   });
   const registryURL = await listen(registry);
   try {

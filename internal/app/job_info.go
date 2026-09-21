@@ -10,9 +10,9 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/agent0ai/spynel/internal/core"
-	"github.com/agent0ai/spynel/internal/orchestrator"
-	"github.com/agent0ai/spynel/internal/shortid"
+	"github.com/edheltzel/iris/internal/core"
+	"github.com/edheltzel/iris/internal/orchestrator"
+	"github.com/edheltzel/iris/internal/shortid"
 )
 
 const (

@@ -17,6 +17,15 @@ const MAX_CHECKSUM_BYTES = 1024 * 1024;
 const MAX_ARCHIVE_ENTRIES = 4096;
 const MAX_ENTRY_PATH_BYTES = 1024;
 const MAX_EXPANDED_BYTES = 2 * 1024 * 1024 * 1024;
+const MAX_NPM_OUTPUT_BYTES = 64 * 1024;
+const LEGACY_PACKAGE = "spynel";
+const LEGACY_REPOSITORY = "git+https://github.com/agent0ai/spynel.git";
+
+function cleanupUserID(currentUserID = typeof process.getuid === "function" ? process.getuid() : -1, sudoUserID = process.env.SUDO_UID) {
+  if (currentUserID !== 0 || !/^(0|[1-9][0-9]*)$/.test(sudoUserID || "")) return currentUserID;
+  const parsed = Number(sudoUserID);
+  return Number.isSafeInteger(parsed) ? parsed : currentUserID;
+}
 
 function download(url, file, maxBytes, redirects = 0, secureRequired = new URL(url).protocol === "https:") {
   return new Promise((resolve, reject) => {
@@ -120,16 +129,84 @@ function validateExtractedTree(root) {
   visit(root);
 }
 
+function removeVerifiedLegacyGlobalPackage(packageRoot = path.resolve(__dirname, "..")) {
+  const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+  const rootResult = childProcess.spawnSync(npm, ["root", "--global"], {
+    encoding: "utf8",
+    maxBuffer: MAX_NPM_OUTPUT_BYTES,
+    timeout: 10_000,
+    windowsHide: true,
+  });
+  if (rootResult.error || rootResult.status !== 0) {
+    if (process.env.npm_config_global === "true") {
+      throw rootResult.error || new Error("npm root --global failed while checking for the legacy Spynel package");
+    }
+    return;
+  }
+  const globalRoot = rootResult.stdout.trim();
+  if (!path.isAbsolute(globalRoot) || /[\0\r\n]/.test(globalRoot)) return;
+  try {
+    if (fs.realpathSync(packageRoot) !== fs.realpathSync(path.join(globalRoot, pkg.name))) return;
+  } catch (_) {
+    return;
+  }
+
+  const legacyRoot = path.join(globalRoot, LEGACY_PACKAGE);
+  const legacyManifest = path.join(legacyRoot, "package.json");
+  let rootInfo;
+  let manifestInfo;
+  try {
+    rootInfo = fs.lstatSync(legacyRoot);
+    manifestInfo = fs.lstatSync(legacyManifest);
+  } catch (error) {
+    if (error.code === "ENOENT") return;
+    throw error;
+  }
+  if (!rootInfo.isDirectory() || !manifestInfo.isFile() || manifestInfo.size > MAX_NPM_OUTPUT_BYTES) return;
+
+  let legacy;
+  try {
+    legacy = JSON.parse(fs.readFileSync(legacyManifest, "utf8"));
+  } catch (_) {
+    return;
+  }
+  const repository = typeof legacy.repository === "string" ? legacy.repository : legacy.repository && legacy.repository.url;
+  if (legacy.name !== LEGACY_PACKAGE || repository !== LEGACY_REPOSITORY ||
+      !legacy.bin || legacy.bin.spynel !== "npm/bin/spynel.js") return;
+
+  const cleanup = childProcess.spawnSync(path.join(packageRoot, "npm", "vendor", "iris"), ["cleanup-legacy-npm", "--root", legacyRoot, "--user-id", String(cleanupUserID())], {
+    stdio: "inherit",
+    timeout: 30_000,
+    windowsHide: false,
+  });
+  if (cleanup.error) throw cleanup.error;
+  if (cleanup.status !== 0) throw new Error(`legacy Spynel cleanup exited with status ${cleanup.status}`);
+
+  const result = childProcess.spawnSync(npm, ["uninstall", "--global", LEGACY_PACKAGE], {
+    stdio: "inherit",
+    timeout: 120_000,
+    windowsHide: false,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(`npm uninstall --global ${LEGACY_PACKAGE} exited with status ${result.status}`);
+  if (fs.existsSync(legacyRoot)) throw new Error(`npm uninstall --global ${LEGACY_PACKAGE} left the verified package installed`);
+}
+
 async function install() {
   const target = current();
-  const archive = `spynel_${version}_${target.os}_${target.arch}.${target.ext}`;
-  const base = process.env.SPYNEL_DOWNLOAD_BASE || `https://github.com/agent0ai/spynel/releases/download/v${version}`;
-  const destination = path.join(vendor, "spynel");
+  const archive = `iris_${version}_${target.os}_${target.arch}.${target.ext}`;
+  const base = process.env.SPYNEL_DOWNLOAD_BASE || `https://github.com/edheltzel/Iris/releases/download/v${version}`;
+  const destination = path.join(vendor, "iris");
+  let alreadyInstalled = false;
   if (fs.existsSync(destination) && fs.existsSync(marker)) {
     try {
       const installed = JSON.parse(fs.readFileSync(marker, "utf8"));
-      if (installed.version === version && installed.os === target.os && installed.arch === target.arch) return;
+      alreadyInstalled = installed.version === version && installed.os === target.os && installed.arch === target.arch;
     } catch (_) {}
+  }
+  if (alreadyInstalled) {
+    removeVerifiedLegacyGlobalPackage();
+    return;
   }
   const staging = fs.mkdtempSync(path.join(__dirname, ".install-"));
   try {
@@ -148,7 +225,7 @@ async function install() {
     childProcess.execFileSync("tar", ["-xzf", temp, "-C", staging, "--no-same-owner", "--no-same-permissions"]);
     fs.rmSync(temp);
     validateExtractedTree(staging);
-    const stagedBinary = path.join(staging, "spynel");
+    const stagedBinary = path.join(staging, "iris");
     if (!fs.lstatSync(stagedBinary).isFile()) throw new Error(`release archive does not contain ${path.basename(stagedBinary)}`);
     fs.chmodSync(stagedBinary, 0o755);
     fs.writeFileSync(path.join(staging, ".installed.json"), JSON.stringify({ version, os: target.os, arch: target.arch }) + "\n", { mode: 0o600 });
@@ -170,6 +247,7 @@ async function install() {
     fs.rmSync(staging, { recursive: true, force: true });
     throw error;
   }
+  removeVerifiedLegacyGlobalPackage();
 }
 
 if (require.main === module) {
@@ -179,4 +257,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { install, validateArchiveEntries, validateExtractedTree };
+module.exports = { cleanupUserID, install, validateArchiveEntries, validateExtractedTree };

@@ -160,7 +160,7 @@ Build with the repository's supported Go toolchain:
 
 ```sh
 scripts/dev.sh build
-.tmp-bin/spynel serve --tui --config /path/to/workspace/.spynel/config.yaml
+.tmp-bin/iris serve --tui --config /path/to/workspace/.spynel/config.yaml
 ```
 
 Use a synthetic conversation for these checks:

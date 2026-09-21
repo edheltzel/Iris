@@ -18,10 +18,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/fsx"
+	"github.com/edheltzel/iris/internal/fsx"
 )
 
 const ownershipMarker = "spynel-github-v1\n"
+
+var removeLegacyLauncher = os.Remove
 
 type bundleMetadata struct {
 	Version string `json:"version"`
@@ -52,7 +54,7 @@ func ownedRoot(root string) bool {
 
 func scriptRootFromExecutable(executable, version string) string {
 	executable, err := filepath.EvalSymlinks(executable)
-	if err != nil || filepath.Base(executable) != "spynel" {
+	if err != nil || filepath.Base(executable) != "iris" {
 		return ""
 	}
 	bundle := filepath.Dir(executable)
@@ -73,10 +75,10 @@ func scriptRootFromExecutable(executable, version string) string {
 // retain their ordinary restart behavior.
 func RestartExecutable(executable string) string {
 	if processNPMRoot != "" && processMatches(ProcessRegistration{Executable: processExecutable, Installation: processNPMRoot}, executable) {
-		return filepath.Join(processNPMRoot, "npm", "vendor", "spynel")
+		return filepath.Join(processNPMRoot, "npm", "vendor", "iris")
 	}
 	if root := scriptRootFromExecutable(executable, ""); root != "" {
-		return filepath.Join(root, "spynel")
+		return filepath.Join(root, "iris")
 	}
 	return executable
 }
@@ -98,7 +100,7 @@ func privateDirectory(directory string) error {
 // InstallArchive is also the verified bootstrap binary's installation boundary.
 // It never adopts a nonempty unmanaged directory, replaces an unrelated entry
 // point, or mutates a previously published bundle.
-func InstallArchive(ctx context.Context, root, archive, checksums, version string) (string, error) {
+func InstallArchive(ctx context.Context, root, archive, checksums, version string, migrateLegacyStartup func(context.Context, string, string) error) (string, error) {
 	version = strings.TrimPrefix(version, "v")
 	if !stableVersion(version) {
 		return "", errors.New("installation requires a stable semantic version")
@@ -138,16 +140,31 @@ func InstallArchive(ctx context.Context, root, archive, checksums, version strin
 	if err := privateDirectory(filepath.Join(root, "releases")); err != nil {
 		return "", err
 	}
-	launcher := filepath.Join(root, "spynel")
-	if target, err := os.Readlink(launcher); err == nil {
+	legacyLauncher := filepath.Join(root, "spynel")
+	legacyOwned := false
+	if target, err := os.Readlink(legacyLauncher); err == nil {
 		if target != "current/spynel" {
+			return "", errors.New("refusing to replace an unrelated legacy launcher")
+		}
+		legacyOwned = true
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", errors.New("refusing to replace an unrelated legacy executable")
+	}
+	if legacyOwned && migrateLegacyStartup == nil {
+		return "", errors.New("legacy installation requires startup registration migration")
+	}
+	launcher := filepath.Join(root, "iris")
+	if target, err := os.Readlink(launcher); err == nil {
+		if target != "current/iris" {
 			return "", errors.New("refusing to replace an unrelated launcher")
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return "", errors.New("refusing to replace an unrelated executable")
 	}
 	current := filepath.Join(root, "current")
+	currentTarget := ""
 	if target, err := os.Readlink(current); err == nil {
+		currentTarget = target
 		if filepath.Dir(target) != "releases" {
 			return "", errors.New("invalid current bundle link")
 		}
@@ -190,7 +207,10 @@ func InstallArchive(ctx context.Context, root, archive, checksums, version strin
 	if err := os.Rename(stage, destination); err != nil {
 		return "", err
 	}
-	if err := os.Symlink("current/spynel", launcher); err != nil && !errors.Is(err, os.ErrExist) {
+	launcherCreated := false
+	if err := os.Symlink("current/iris", launcher); err == nil {
+		launcherCreated = true
+	} else if !errors.Is(err, os.ErrExist) {
 		return "", err
 	}
 	link := filepath.Join(root, ".current-"+filepath.Base(destination))
@@ -203,6 +223,36 @@ func InstallArchive(ctx context.Context, root, archive, checksums, version strin
 	}
 	if err := os.Rename(link, current); err != nil {
 		return "", err
+	}
+	rollbackCurrent := func(cause error) error {
+		errorsFound := []error{cause}
+		if currentTarget == "" {
+			if err := os.Remove(current); err != nil && !errors.Is(err, os.ErrNotExist) {
+				errorsFound = append(errorsFound, err)
+			}
+		} else if err := os.Symlink(currentTarget, link); err != nil {
+			errorsFound = append(errorsFound, err)
+		} else if err := os.Rename(link, current); err != nil {
+			errorsFound = append(errorsFound, err)
+		}
+		if launcherCreated {
+			if err := os.Remove(launcher); err != nil && !errors.Is(err, os.ErrNotExist) {
+				errorsFound = append(errorsFound, err)
+			}
+		}
+		return errors.Join(errorsFound...)
+	}
+	if legacyOwned {
+		if err := migrateLegacyStartup(ctx, legacyLauncher, launcher); err != nil {
+			return "", rollbackCurrent(err)
+		}
+		if err := removeLegacyLauncher(legacyLauncher); err != nil && !errors.Is(err, os.ErrNotExist) {
+			cause := fmt.Errorf("remove legacy launcher: %w", err)
+			if reverseErr := migrateLegacyStartup(ctx, launcher, legacyLauncher); reverseErr != nil {
+				cause = errors.Join(cause, fmt.Errorf("reverse startup migration: %w", reverseErr))
+			}
+			return "", rollbackCurrent(cause)
+		}
 	}
 	return launcher, nil
 }
@@ -332,7 +382,7 @@ func extractBundle(ctx context.Context, input io.Reader, destination string) err
 }
 
 func verifyBundle(ctx context.Context, directory, version string) error {
-	required := []string{"spynel", "LICENSE", "THIRD_PARTY_NOTICES.md", "licenses/sherpa-onnx/LICENSE", "licenses/onnxruntime/LICENSE", "licenses/miniaudio/LICENSE", "licenses/pion-opus/LICENSE", "licenses/bubbletea/LICENSE", "licenses/bubbles-textarea/LICENSE"}
+	required := []string{"iris", "LICENSE", "THIRD_PARTY_NOTICES.md", "licenses/sherpa-onnx/LICENSE", "licenses/onnxruntime/LICENSE", "licenses/miniaudio/LICENSE", "licenses/pion-opus/LICENSE", "licenses/bubbletea/LICENSE", "licenses/bubbles-textarea/LICENSE"}
 	if runtime.GOOS == "darwin" {
 		required = append(required, "lib/libsherpa-onnx-c-api.dylib", "lib/libonnxruntime.1.27.0.dylib")
 	} else {
@@ -344,7 +394,7 @@ func verifyBundle(ctx context.Context, directory, version string) error {
 			return fmt.Errorf("release bundle is missing required file %s", name)
 		}
 	}
-	binary := filepath.Join(directory, "spynel")
+	binary := filepath.Join(directory, "iris")
 	if err := os.Chmod(binary, 0700); err != nil {
 		return err
 	}
@@ -357,7 +407,7 @@ func verifyBundle(ctx context.Context, directory, version string) error {
 	if err := command.Run(); err != nil {
 		return fmt.Errorf("candidate executable check failed: %w", err)
 	}
-	if strings.TrimSpace(output.text) != "spynel "+version {
+	if strings.TrimSpace(output.text) != "iris "+version {
 		return errors.New("candidate executable version does not match release")
 	}
 	return nil

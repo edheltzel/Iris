@@ -1,5 +1,5 @@
 {
-  "name": "spynel",
+  "name": "@edheltzel/iris",
   "version": "0.0.0-development",
   "description": "A non-AI orchestration layer connecting one human to many coding agents",
   "license": "MIT",
@@ -13,7 +13,7 @@
     "automation"
   ],
   "bin": {
-    "spynel": "npm/bin/spynel.js"
+    "iris": "npm/bin/iris.js"
   },
   "scripts": {
     "postinstall": "node npm/install.js",
@@ -32,12 +32,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/agent0ai/spynel.git"
+    "url": "git+https://github.com/edheltzel/Iris.git"
   },
   "bugs": {
-    "url": "https://github.com/agent0ai/spynel/issues"
+    "url": "https://github.com/edheltzel/Iris/issues"
   },
-  "homepage": "https://github.com/agent0ai/spynel#readme",
+  "homepage": "https://github.com/edheltzel/Iris#readme",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org"

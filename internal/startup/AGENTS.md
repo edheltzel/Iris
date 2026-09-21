@@ -6,7 +6,7 @@
 
 ## Local Contracts
 
-- Register `spynel serve` against the absolute canonical workspace configuration and derive its workspace identifier from that fixed path.
+- Register `iris serve` against the absolute canonical workspace configuration and derive its workspace identifier from that fixed path.
 - Escape control characters and platform metacharacters in generated service values; never invoke a shell with untrusted configuration.
 - Linux `WorkingDirectory` and description use literal scalar values with escaped percent specifiers, never command-argument quotes or backslash escapes. Preserve trailing spaces/backslashes with a final directory slash; reject workspace paths containing control characters before creating startup artifacts. Keep `ExecStart` arguments quoted separately and prefix the executable with `:` to disable environment-variable substitution in literal paths.
 - Systemd system services explicitly declare `User=root`. Systemd and launchd registrations carry the registering process's `HOME` and any explicit `XDG_CONFIG_HOME`/`XDG_CACHE_HOME`, so headless startup can find the same per-user identity, harness homes, and speech cache as interactive launches. Do not copy arbitrary environment variables or credentials into service files.
@@ -16,10 +16,11 @@
 - Register script installations through updater-resolved stable entry points rather than a resolved retained release binary. npm installations keep their supervising launcher; generated services always pass `--automatic-startup` and never perform proactive checks.
 
 - Explicit installation removal scans bounded generated registrations for the exact stable executable or npm launcher, including quoted special paths. Stop/unload matching services and remove their future startup registrations before deleting binaries; ordinary preference changes retain their existing lifecycle. An absent Linux user manager allows offline removal, but an active service that cannot be stopped fails closed. Elevated removal retains the original user scope alongside system registrations.
+- Standalone legacy upgrade rewrites only generated registrations whose executable is the exact owned sibling `spynel` launcher to the sibling `iris` launcher. Validate replacements, atomically restore prior registration bytes on failure, reload an available systemd manager and restart only exact units that were active, and boot out then bootstrap only matching loaded launchd jobs against the rewritten plist. Rollback reloads and restarts use a short cancellation-independent cleanup deadline. Preserve unrelated registrations byte-for-byte.
 
 - `Enabled` inspects persistent native registration without changing it or trusting the saved preference. Linux queries the exact unit file; macOS checks the launchd override and validated LaunchAgent/LaunchDaemon file. Failed or unrecognized queries return an error, never an assumed disabled state.
 
-- `StopInstallation` shares exact registration ownership and native stop/unload with removal, but retains registration files and enabled links. `spynel killall` uses it before process termination to prevent service-manager respawn without changing future boot/login preferences.
+- `StopInstallation` shares exact registration ownership and native stop/unload with removal, but retains registration files and enabled links. `iris killall` uses it before process termination to prevent service-manager respawn without changing future boot/login preferences.
 
 ## Child DOX Index
 

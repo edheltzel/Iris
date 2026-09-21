@@ -76,19 +76,19 @@ For macOS and Linux:
 
 ```sh
 curl -LsSf https://spynel.agent-zero.ai/install.sh | sh
-spynel
+iris
 ```
 
 Or use npm (Node.js 18+):
 
 ```bash
-npm install -g spynel
-spynel
+npm install -g @edheltzel/iris
+iris
 ```
 
-Use `spynel update` to update Spynel and restart its running instances. Use `spynel killall` to stop all running Spynel instances.
+Use `iris update` to update Spynel and restart its running instances. Use `iris killall` to stop all running Spynel instances.
 
-Run `spynel` from your project directory.
+Run `iris` from your project directory.
 
 Use `/config` for setup.
 

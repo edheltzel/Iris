@@ -7,8 +7,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/agent0ai/spynel/internal/core"
-	"github.com/agent0ai/spynel/internal/markdown"
+	"github.com/edheltzel/iris/internal/core"
+	"github.com/edheltzel/iris/internal/markdown"
 	charmansi "github.com/charmbracelet/x/ansi"
 )
 

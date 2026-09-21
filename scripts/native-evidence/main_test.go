@@ -17,7 +17,7 @@ func TestEvidenceSerializationIsBoundedAndPathMinimal(t *testing.T) {
 		SourceRef: "v1.2.3", SourceCommit: strings.Repeat("a", 40), OS: "linux",
 		Architecture: "arm64", GoVersion: "go version go1.26.5 linux/arm64",
 		Archive: archiveEvidence{Name: filepath.Base(privatePath), SHA256: strings.Repeat("b", 64)},
-		Results: []result{{Name: "packaged-help", Command: "spynel --help", Status: "pass", Assertion: "help launches"}},
+		Results: []result{{Name: "packaged-help", Command: "iris --help", Status: "pass", Assertion: "help launches"}},
 	}
 	data, err := json.Marshal(record)
 	if err != nil {
@@ -62,11 +62,11 @@ func TestSafeDestinationRejectsTraversal(t *testing.T) {
 }
 
 func TestContainsOutputLineToleratesNativeRuntimeDiagnostics(t *testing.T) {
-	output := "native runtime warning\r\nspynel 1.2.3\r\n"
-	if !containsOutputLine(output, "spynel 1.2.3") {
+	output := "native runtime warning\r\niris 1.2.3\r\n"
+	if !containsOutputLine(output, "iris 1.2.3") {
 		t.Fatal("version line was not found after a native runtime diagnostic")
 	}
-	if containsOutputLine(output, "spynel 9.9.9") {
+	if containsOutputLine(output, "iris 9.9.9") {
 		t.Fatal("wrong version line matched")
 	}
 }

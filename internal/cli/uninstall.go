@@ -8,14 +8,59 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/startup"
-	"github.com/agent0ai/spynel/internal/updater"
+	"github.com/edheltzel/iris/internal/startup"
+	"github.com/edheltzel/iris/internal/updater"
 )
+
+func runCleanupLegacyNPM(args []string) error {
+	flags := flag.NewFlagSet("cleanup-legacy-npm", flag.ContinueOnError)
+	root := flags.String("root", "", "legacy npm package directory")
+	userID := flags.Int("user-id", os.Getuid(), "user whose startup registrations are removed")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 || !filepath.IsAbs(*root) || *userID < 0 || os.Geteuid() != 0 && *userID != os.Getuid() {
+		return errors.New("cleanup-legacy-npm requires an absolute root and authorized user ID")
+	}
+	home, err := cleanupUserHome(*userID)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	installation := &updater.Manager{PackageRoot: *root}
+	return installation.StopLegacyNPM(ctx, func(root string) error {
+		manager, err := startup.New(filepath.Join(root, "npm", "vendor", "spynel"))
+		if err != nil {
+			return err
+		}
+		manager.Home = home
+		manager.NPMLauncher = filepath.Join(root, "npm", "bin", "spynel.js")
+		return manager.RemoveInstallation(ctx, *userID)
+	})
+}
+
+func cleanupUserHome(userID int) (string, error) {
+	account, err := user.LookupId(strconv.Itoa(userID))
+	if err != nil {
+		return "", fmt.Errorf("look up cleanup user: %w", err)
+	}
+	home := filepath.Clean(account.HomeDir)
+	info, err := os.Stat(home)
+	if err != nil {
+		return "", fmt.Errorf("inspect cleanup user home: %w", err)
+	}
+	if !filepath.IsAbs(home) || home == string(filepath.Separator) || !info.IsDir() {
+		return "", errors.New("cleanup user has an invalid home directory")
+	}
+	return home, nil
+}
 
 func runUninstallBundles(args []string) error {
 	flags := flag.NewFlagSet("uninstall-bundles", flag.ContinueOnError)
@@ -53,7 +98,7 @@ func runUninstallBundles(args []string) error {
 		if !filepath.IsAbs(modules) || strings.ContainsAny(modules, "\r\n") {
 			return errors.New("npm returned an invalid global package directory")
 		}
-		*npmRoot = filepath.Join(modules, "spynel")
+		*npmRoot = filepath.Join(modules, "@edheltzel", "iris")
 	}
 	if *npmRoot != "" {
 		if !filepath.IsAbs(*npmRoot) {
@@ -72,7 +117,7 @@ func runUninstallBundles(args []string) error {
 				if err != nil {
 					return err
 				}
-				fmt.Fprintln(os.Stderr, "Administrator access is required to uninstall Spynel.")
+				fmt.Fprintln(os.Stderr, "Administrator access is required to uninstall Iris.")
 				command := exec.CommandContext(ctx, "sudo", "--", "env", "HOME="+home, "PATH="+os.Getenv("PATH"), executable, "uninstall-bundles", "--root", *root, "--npm-root", *npmRoot, "--user-id", strconv.Itoa(*userID))
 				command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
 				return command.Run()
@@ -85,17 +130,23 @@ func runUninstallBundles(args []string) error {
 			if err != nil {
 				return err
 			}
-			manager.Executable = filepath.Join(installation.InstallRoot, "spynel")
 			manager.NPMLauncher = ""
+			executables := []string{filepath.Join(installation.InstallRoot, "iris"), filepath.Join(installation.InstallRoot, "spynel")}
 			if installation.PackageRoot != "" {
-				manager.Executable = filepath.Join(installation.PackageRoot, "npm", "vendor", "spynel")
-				manager.NPMLauncher = filepath.Join(installation.PackageRoot, "npm", "bin", "spynel.js")
+				executables = []string{filepath.Join(installation.PackageRoot, "npm", "vendor", "iris")}
+				manager.NPMLauncher = filepath.Join(installation.PackageRoot, "npm", "bin", "iris.js")
 			}
-			return manager.RemoveInstallation(ctx, *userID)
+			for _, executable := range executables {
+				manager.Executable = executable
+				if err := manager.RemoveInstallation(ctx, *userID); err != nil {
+					return err
+				}
+			}
+			return nil
 		}); err != nil {
 			return err
 		}
 	}
-	fmt.Fprintln(os.Stdout, "Spynel uninstalled.")
+	fmt.Fprintln(os.Stdout, "Iris uninstalled.")
 	return nil
 }

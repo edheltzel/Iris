@@ -18,7 +18,7 @@ const state = term => {
 for (const archiveOnED2 of [false, true]) {
   const term = makeTerminal();
   const expectedExit = makeTerminal();
-  const seed = "unrelated shell history\r\n".repeat(30) + "\x1b[H\x1b[J" + "shell before TUI\r\n$ spynel\r\n";
+  const seed = "unrelated shell history\r\n".repeat(30) + "\x1b[H\x1b[J" + "shell before TUI\r\n$ iris\r\n";
   await write(term, seed);
   await write(expectedExit, seed);
   const shellHistory = state(term).lines.slice(0, term.buffer.normal.baseY);

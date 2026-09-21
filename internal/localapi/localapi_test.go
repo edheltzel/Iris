@@ -17,18 +17,41 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agent0ai/spynel/internal/app"
-	"github.com/agent0ai/spynel/internal/config"
-	"github.com/agent0ai/spynel/internal/core"
-	"github.com/agent0ai/spynel/internal/history"
-	"github.com/agent0ai/spynel/internal/instance"
-	"github.com/agent0ai/spynel/internal/shortid"
+	"github.com/edheltzel/iris/internal/app"
+	"github.com/edheltzel/iris/internal/config"
+	"github.com/edheltzel/iris/internal/core"
+	"github.com/edheltzel/iris/internal/history"
+	"github.com/edheltzel/iris/internal/instance"
+	"github.com/edheltzel/iris/internal/shortid"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (function roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
 	return function(request)
+}
+
+func TestMain(m *testing.M) {
+	root, err := os.MkdirTemp("", "iris-localapi-test-")
+	if err != nil {
+		panic(err)
+	}
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		panic(err)
+	}
+	for name, value := range map[string]string{
+		"HOME":            filepath.Join(root, "home"),
+		"XDG_CONFIG_HOME": filepath.Join(root, "config"),
+		"XDG_CACHE_HOME":  filepath.Join(root, "cache"),
+	} {
+		if err := os.Setenv(name, value); err != nil {
+			panic(err)
+		}
+	}
+	code := m.Run()
+	_ = os.RemoveAll(root)
+	os.Exit(code)
 }
 
 func environmentID(character string) string { return strings.Repeat(character, 64) }

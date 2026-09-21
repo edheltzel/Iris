@@ -60,6 +60,6 @@ Every setting below is exposed by the shared typed catalog used by the TUI, slas
 | `speech.max_duration_seconds` | Live | Replacement bounds the next transcription duration | Range validation rejects before commit | speech duration tests |
 | `speech.chunk_seconds` | Live | Replacement chunks the next transcription at the new duration | Range validation rejects before commit | speech chunk tests |
 
-`channels.tui.enabled` is intentionally absent. Legacy YAML containing it is normalized during load and a canonical save removes it. Bare `spynel` launches the TUI; `spynel serve` remains headless unless invoked with `--tui`.
+`channels.tui.enabled` is intentionally absent. Legacy YAML containing it is normalized during load and a canonical save removes it. Bare `iris` launches the TUI; `iris serve` remains headless unless invoked with `--tui`.
 
 Task and goal workflows use fixed `.spynel` folders and rules. Unused configuration keys are ignored on load and omitted by the next canonical save.
