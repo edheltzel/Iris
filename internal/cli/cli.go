@@ -1342,6 +1342,19 @@ func doctor() error {
 	}
 	_ = os.Remove(testPath)
 	fmt.Println("state directory: writable (" + cfg.StatePath() + ")")
+	if !cfg.Extensions.Enabled {
+		fmt.Println("extensions: disabled")
+	} else {
+		names, err := extensions.Inspect(cfg.Resolve(cfg.Extensions.Directory))
+		if err != nil {
+			return err
+		}
+		if len(names) == 0 {
+			fmt.Println("extensions: none")
+		} else {
+			fmt.Println("extensions: ok (" + strings.Join(names, ", ") + ")")
+		}
+	}
 	if cfg.Channels.Telegram.Enabled && cfg.TelegramToken() == "" {
 		return errors.New("Telegram is enabled but its token is empty")
 	}

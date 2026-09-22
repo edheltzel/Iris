@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
 	"runtime"
@@ -24,6 +25,7 @@ import (
 	"github.com/edheltzel/iris/internal/channel/tui"
 	"github.com/edheltzel/iris/internal/config"
 	"github.com/edheltzel/iris/internal/core"
+	"github.com/edheltzel/iris/internal/extensions"
 	"github.com/edheltzel/iris/internal/harness"
 	"github.com/edheltzel/iris/internal/history"
 	"github.com/edheltzel/iris/internal/instance"
@@ -887,6 +889,66 @@ func TestInitNoStartCreatesWorkspaceWithoutEnteringTUI(t *testing.T) {
 	}
 	if !strings.Contains(helpText, "--no-start") || !strings.Contains(helpText, "continue into the TUI") {
 		t.Fatalf("init continuation is not documented in help:\n%s", helpText)
+	}
+}
+
+func TestDoctorReportsInstalledHelloExtension(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "workspace")
+	if err := Run([]string{"init", "--no-start", "--dir", root}, "test"); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(config.PathForRoot(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Harness.Name = "acp"
+	cfg.Harness.ACPCommand = "true"
+	if err := config.Save(cfg); err != nil {
+		t.Fatal(err)
+	}
+	repository := filepath.Join(t.TempDir(), "hello")
+	if err := os.MkdirAll(repository, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repository, extensions.ManifestName), []byte("name: hello\nhooks:\n  message.received: [\"./hook\"]\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repository, "hook"), []byte("#!/bin/sh\ncat >/dev/null\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"init"}, {"config", "user.email", "test@example.invalid"}, {"config", "user.name", "Test"},
+		{"add", extensions.ManifestName, "hook"}, {"commit", "-m", "hello"},
+	} {
+		command := exec.Command("git", args...)
+		command.Dir = repository
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, output)
+		}
+	}
+	if _, err := extensions.Install(context.Background(), cfg.Resolve(cfg.Extensions.Directory), repository, "hello"); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(root)
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout := os.Stdout
+	os.Stdout = writer
+	err = doctor()
+	_ = writer.Close()
+	os.Stdout = stdout
+	var output bytes.Buffer
+	if _, copyErr := output.ReadFrom(reader); copyErr != nil {
+		t.Fatal(copyErr)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := output.String()
+	if !strings.Contains(got, "extensions: ok (hello)") || !strings.Contains(got, "doctor: all local checks passed") {
+		t.Fatalf("doctor = %q", got)
 	}
 }
 

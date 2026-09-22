@@ -2,6 +2,8 @@
 
 Spynel uses portable executable hooks instead of Go's platform/toolchain-coupled plugin mechanism. Install repositories only after review:
 
+`iris doctor` reports `extensions: none` or `extensions: ok (name, …)` after validating installed manifests. Invalid hook names fail doctor.
+
 ```bash
 iris extension install GIT_URL [NAME]
 iris extension list
