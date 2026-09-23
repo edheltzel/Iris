@@ -82,3 +82,34 @@ func TestInstallAndRemoveGitExtension(t *testing.T) {
 		t.Fatalf("extension was not removed: %v", err)
 	}
 }
+
+func TestInspectReportsHelloExtension(t *testing.T) {
+	repository := filepath.Join(t.TempDir(), "hello")
+	if err := os.MkdirAll(repository, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repository, ManifestName), []byte("name: hello\nhooks:\n  message.received: [\"./hook\"]\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repository, "hook"), []byte("#!/bin/sh\ncat >/dev/null\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"init"}, {"config", "user.email", "test@example.invalid"}, {"config", "user.name", "Test"},
+		{"add", ManifestName, "hook"}, {"commit", "-m", "hello"},
+	} {
+		command := exec.Command("git", args...)
+		command.Dir = repository
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, output)
+		}
+	}
+	directory := filepath.Join(t.TempDir(), "extensions")
+	if _, err := Install(context.Background(), directory, repository, "hello"); err != nil {
+		t.Fatal(err)
+	}
+	names, err := Inspect(directory)
+	if err != nil || len(names) != 1 || names[0] != "hello" {
+		t.Fatalf("inspect = %#v, %v", names, err)
+	}
+}

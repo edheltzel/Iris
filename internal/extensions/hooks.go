@@ -87,6 +87,19 @@ func (r Runner) RunTracked(ctx context.Context, hook string, payload map[string]
 	return r.run(ctx, hook, payload, completed, onCompleted)
 }
 
+// Inspect returns installed extension names after validating manifests.
+func Inspect(directory string) ([]string, error) {
+	items, err := (Runner{Directory: directory}).discover()
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, len(items))
+	for i, item := range items {
+		names[i] = item.manifest.Name
+	}
+	return names, nil
+}
+
 func (r Runner) run(ctx context.Context, hook string, payload map[string]any, completed map[string]bool, onCompleted func(string) error) (HookOutput, error) {
 	result := HookOutput{Payload: clone(payload)}
 	extensions, err := r.discover()
