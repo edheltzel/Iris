@@ -1,0 +1,4 @@
+name: gitbutler
+hooks:
+  task.claimed: ["./hook.sh", "task.claimed"]
+  task.completed: ["./hook.sh", "task.completed"]

@@ -111,7 +111,7 @@ func New(cfg config.Config, target harness.Harness) *Service {
 
 func NewWithRuntime(cfg config.Config, target harness.Harness, runtime *Runtime) *Service {
 	runtime.ConfigureJobArchive(cfg.StatePath("jobs"))
-	hooks := extensions.Runner{Directory: cfg.Resolve(cfg.Extensions.Directory), Timeout: cfg.Extensions.Timeout()}
+	hooks := extensions.Runner{Directory: cfg.Resolve(cfg.Extensions.Directory), Workspace: cfg.Root, Timeout: cfg.Extensions.Timeout()}
 	hooks.Log = runtime.Writer("extensions")
 	store := history.New(cfg.StatePath("history"))
 	recoveryActivation, recoveryActivationErr := store.ActivateRecovery()
