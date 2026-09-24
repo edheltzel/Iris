@@ -1,7 +1,8 @@
 #!/bin/sh
-# Enforces Firstmate delivery modes at Iris task completion.
-# A required gate that is missing fails task.completed. It never starts
-# `no-mistakes axi run`: that command publishes and outlives the hook timeout.
+# Refuse a ship when the resolved Firstmate mode is no-mistakes and the CLI is
+# missing. direct-PR and local-only skip. This hook never runs no-mistakes:
+# axi run publishes, and status only proves init. The pipeline stays the
+# post-commit /no-mistakes step.
 set -u
 
 hook=${SPYNEL_HOOK:-${1:-}}
@@ -30,10 +31,8 @@ journal() {
 }
 
 finish() {
-	action=$1
-	reason=$2
-	journal "$action" "$reason"
-	if [ "$action" = fail ] && [ "$hook" = task.completed ]; then
+	journal "$1" "$2"
+	if [ "$1" = fail ]; then
 		exit 1
 	fi
 	exit 0
@@ -59,7 +58,7 @@ case "$mode" in
 local-only) finish skip "local-only does not run the gate" ;;
 direct-PR) finish skip "direct-PR does not run the gate" ;;
 no-mistakes) ;;
-no-mistakes-prod-only) note "no surface classifier; requiring the gate" ;;
+no-mistakes-prod-only) finish fail "no-mistakes-prod-only is a registry policy, not a task mode" ;;
 *) finish fail "unknown mode $mode" ;;
 esac
 
@@ -72,13 +71,4 @@ fi
 if ! command -v no-mistakes >/dev/null 2>&1; then
 	finish fail "no-mistakes CLI is not installed"
 fi
-if ! cd "$workspace" 2>/dev/null; then
-	finish fail "workspace is unreachable"
-fi
-if ! status=$(no-mistakes status 2>/dev/null); then
-	finish fail "no-mistakes status failed"
-fi
-if ! printf '%s' "$status" | grep -Eq 'gate:[[:space:]]*/'; then
-	finish fail "workspace has no no-mistakes gate"
-fi
-finish pass "gate present"
+finish pass "CLI present; /no-mistakes remains the post-commit agent step"

@@ -2,17 +2,16 @@
 
 ## Purpose
 
-- Own the hook pack that refuses a completed task when Firstmate's delivery mode requires the no-mistakes CLI and that CLI or its repo gate is absent.
+- Own the hook pack that refuses a ship when the resolved Firstmate task mode is `no-mistakes` and the `no-mistakes` CLI is not installed.
 
 ## Local Contracts
 
-- Modes are the Firstmate closed set: `no-mistakes`, `direct-PR`, `local-only`, and `no-mistakes-prod-only`. Read the first line of `.spynel/no-mistakes-mode`. A missing or blank file means `no-mistakes`.
-- `direct-PR` and `local-only` journal a skip and exit zero. They do not invoke the CLI.
-- `no-mistakes-prod-only` has no product-versus-internal classifier here, so it requires the gate.
-- An unknown mode fails `task.completed`.
+- Task modes are only `no-mistakes`, `direct-PR`, and `local-only`. Read the first line of `.spynel/no-mistakes-mode`. A missing or blank file means `no-mistakes`.
+- `no-mistakes-prod-only` is a Firstmate registry policy, not a task mode. Refuse it until intake resolves it to `no-mistakes` or `direct-PR`.
+- `direct-PR` and `local-only` journal a skip and exit zero. They do not look for the CLI.
 - Only outcome `done`, or a missing outcome, is a ship. `failed`, `cancelled`, and `waiting` skip.
-- Refuse by exiting nonzero from `task.completed` only. `harness.after` journals the same failure and exits zero, because failing that hook replaces the chat response and cannot refuse a dispatch that already happened.
-- Run `no-mistakes status` from the workspace. Missing CLI, nonzero status, or no `gate:` line is a failure. Never run `no-mistakes axi run` from this hook: it publishes and exceeds the hook timeout.
+- When the mode is `no-mistakes` and the CLI is missing, both `task.completed` and `harness.after` exit nonzero.
+- When the CLI is present, journal that `/no-mistakes` is the post-commit agent step and exit zero. Do not run `no-mistakes`, `no-mistakes status`, `no-mistakes doctor`, or `no-mistakes axi run`. A status `gate:` line is not validation.
 - Journal skip, fail, and pass to stderr and `.spynel/extensions-state/no-mistakes/journal`.
 
 ## Child DOX Index
