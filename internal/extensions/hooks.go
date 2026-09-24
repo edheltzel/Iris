@@ -48,6 +48,7 @@ type HookOutput struct {
 
 type Runner struct {
 	Directory string
+	Workspace string
 	Timeout   time.Duration
 	Log       io.Writer
 }
@@ -123,7 +124,7 @@ func (r Runner) run(ctx context.Context, hook string, payload map[string]any, co
 		cmd := exec.CommandContext(hookCtx, command[0], command[1:]...)
 		cmd.Dir = extension.root
 		cmd.Stdin = bytes.NewReader(input)
-		cmd.Env = append(os.Environ(), "SPYNEL_HOOK="+hook, "SPYNEL_EXTENSION="+extension.manifest.Name)
+		cmd.Env = append(os.Environ(), "SPYNEL_HOOK="+hook, "SPYNEL_EXTENSION="+extension.manifest.Name, "SPYNEL_WORKSPACE="+r.Workspace)
 		stdout := boundedBuffer{limit: maxHookStdout}
 		stderr := boundedBuffer{limit: maxHookStderr}
 		cmd.Stdout = &stdout

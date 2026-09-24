@@ -58,6 +58,7 @@ Update parent docs when parent-level structure, ownership, workflow, or child in
 
 - The canonical repository and Go module path is `github.com/edheltzel/iris`; release, package, issue, and documentation links use `github.com/edheltzel/Iris`.
 - Version-control writes use GitButler CLI (`but`): commits, branches, push, `but pull` onto the target, and `but pr`. Do not run `git add`, `git commit`, `git push`, `git checkout`, `git merge`, `git rebase`, `git stash`, or `git cherry-pick`. Read-only inspection (`git log`, `git blame`, `git show`) is allowed.
+- Product GitButler integration is shelled `but` from first-party hook packs under `extensions/`, never a dependency on GitButler's own store. Such hooks exit zero when the CLI or project mode is missing, and they never push, land, or open a review.
 - Keep the README quick start focused on installation and launch commands plus platform/prerequisite requirements. Describe the supported platforms as macOS and Linux, without Windows caveats or promises. Do not narrate installer progress, PATH mechanics, or installation file locations there; put those details in the getting-started documentation. Keep prerequisite and uninstall data-retention information concise and remove duplicate setup instructions and speculative setup claims.
 - Keep the root README's public community links aligned with the Agent Zero ecosystem: the Agent Zero website and repository, Discord, X, YouTube, GitHub Sponsors, and Spynel's own GitHub Issues page. Do not add product-specific links or unsupported Spynel services.
 - Keep application and orchestration code harness-neutral. Codex, Claude Code, Agent Zero CLI, Pi RPC, and ACP behavior belongs in `internal/harness`; future harnesses register metadata/factories there, implement the same interface, and explicitly declare native-steer or queued follow-up behavior. ACP-compatible CLIs normally use one concise command/argument alias around the shared v1 stdio adapter; only the explicit custom ACP profile accepts a user command and shell-free argument list. Agent Zero CLI uses `a0 acp` and must pass `a0 acp --check` before discovery reports it as available.
@@ -119,6 +120,7 @@ Direct child DOX files:
 | [.github/AGENTS.md](.github/AGENTS.md) | CI and release workflows. |
 | [cmd/AGENTS.md](cmd/AGENTS.md) | Executable entry points. |
 | [docs/AGENTS.md](docs/AGENTS.md) | User, protocol, configuration, architecture, and release documentation. |
+| [extensions/AGENTS.md](extensions/AGENTS.md) | First-party executable hook packs. |
 | [internal/AGENTS.md](internal/AGENTS.md) | Go runtime packages and embedded workspace templates. |
 | [npm/AGENTS.md](npm/AGENTS.md) | npm launcher and binary acquisition. |
 | [scripts/AGENTS.md](scripts/AGENTS.md) | Developer, build, and smoke-test helpers. |

@@ -188,3 +188,33 @@ func TestTrackedHookRetriesWhenCompletionReceiptCannotPersist(t *testing.T) {
 		t.Fatalf("retried event payloads = %q", data)
 	}
 }
+
+func TestHookReceivesWorkspaceRoot(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell fixture")
+	}
+	root := t.TempDir()
+	workspace := t.TempDir()
+	extension := filepath.Join(root, "env")
+	if err := os.MkdirAll(extension, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	manifest := "name: env\nhooks:\n  message.received: [\"./hook.sh\"]\n"
+	script := "#!/bin/sh\ncat >/dev/null\nprintf '%s' \"$SPYNEL_WORKSPACE\" > workspace.seen\n"
+	if err := os.WriteFile(filepath.Join(extension, ManifestName), []byte(manifest), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(extension, "hook.sh"), []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (Runner{Directory: root, Workspace: workspace, Timeout: time.Second}).Run(context.Background(), "message.received", nil); err != nil {
+		t.Fatal(err)
+	}
+	seen, err := os.ReadFile(filepath.Join(extension, "workspace.seen"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(seen) != workspace {
+		t.Fatalf("SPYNEL_WORKSPACE = %q, want %q", seen, workspace)
+	}
+}
