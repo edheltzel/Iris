@@ -261,3 +261,38 @@ func TestSemanticHeartbeatPromptUsesHeartbeatPrefixAndInstructions(t *testing.T)
 		t.Fatalf("heartbeat prefix/instructions missing: %q", prompt)
 	}
 }
+
+func writeQuotaCompanion(t *testing.T, manager *Manager, script string) {
+	t.Helper()
+	dir := filepath.Join(manager.Config.Resolve(manager.Config.Extensions.Directory), "quota")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "wake.sh"), []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestQuotaCompanionAbsorbsWithoutProvider(t *testing.T) {
+	target := &heartbeatHarness{}
+	manager := newHeartbeatManager(t, target)
+	writeQuotaCompanion(t, manager, "#!/bin/sh\nprintf 'absorb\\n'\n")
+	manager.runSemanticHeartbeatOnce(context.Background())
+	target.mu.Lock()
+	defer target.mu.Unlock()
+	if target.prompt != "" {
+		t.Fatalf("absorbed heartbeat sent %q", target.prompt)
+	}
+}
+
+func TestQuotaCompanionDispatchAppendsSnapshot(t *testing.T) {
+	target := &heartbeatHarness{}
+	manager := newHeartbeatManager(t, target)
+	writeQuotaCompanion(t, manager, "#!/bin/sh\nprintf 'dispatch\\nheadroom 40\\n'\n")
+	manager.runSemanticHeartbeatOnce(context.Background())
+	target.mu.Lock()
+	defer target.mu.Unlock()
+	if !strings.Contains(target.prompt, "headroom 40") {
+		t.Fatalf("dispatch snapshot missing: %q", target.prompt)
+	}
+}

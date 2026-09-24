@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -294,6 +295,18 @@ func (m *Manager) runSemanticHeartbeatOnceForTerm(parent context.Context, term u
 		providerStarted = false
 		return
 	}
+	absorb, extra, companionErr := m.quotaCompanion(parent)
+	if companionErr != nil {
+		m.log("quota companion skipped: " + companionErr.Error())
+	}
+	if absorb {
+		m.log("semantic heartbeat absorbed by quota companion")
+		providerStarted = false
+		return
+	}
+	if extra != "" {
+		prompt += "\n\nCompanion quota snapshot:\n" + extra
+	}
 	lease := Lease{DocumentType: "heartbeat", Route: "semantic-heartbeat", SessionKey: semanticHeartbeatSession, State: "working", Phase: "semantic_heartbeat", StartedAt: now, HeartbeatAt: now}
 	message := config.PrependAgentPrefix(m.harnessSettings().HeartbeatAgentPrefix, prompt)
 	resultReady := make(chan ordinaryAgentResult, 1)
@@ -328,6 +341,42 @@ func (m *Manager) runSemanticHeartbeatOnceForTerm(parent context.Context, term u
 		m.log("semantic heartbeat job ended with an error: " + result.err.Error())
 	}
 	return providerStarted
+}
+
+// quotaCompanion asks the optional workspace script whether this tick needs a
+// provider. A missing script preserves the current heartbeat. The script owns
+// the absorb decision; this function does not inspect tasks or quota.
+func (m *Manager) quotaCompanion(ctx context.Context) (absorb bool, extra string, err error) {
+	script := filepath.Join(m.Config.Resolve(m.Config.Extensions.Directory), "quota", "wake.sh")
+	info, statErr := os.Stat(script)
+	if statErr != nil {
+		if errors.Is(statErr, os.ErrNotExist) {
+			return false, "", nil
+		}
+		return false, "", statErr
+	}
+	if info.IsDir() {
+		return false, "", nil
+	}
+	runCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	command := exec.CommandContext(runCtx, "sh", script)
+	command.Dir = m.Config.Root
+	command.Env = append(os.Environ(), "SPYNEL_WORKSPACE="+m.Config.Root)
+	output, runErr := command.Output()
+	if runErr != nil {
+		return false, "", runErr
+	}
+	text := string(output)
+	line, rest, _ := strings.Cut(text, "\n")
+	line = strings.TrimSpace(line)
+	if len(rest) > 4096 {
+		rest = rest[:4096]
+	}
+	if line == "absorb" {
+		return true, "", nil
+	}
+	return false, strings.TrimSpace(rest), nil
 }
 
 func (m *Manager) semanticHeartbeatProviderInFlight() bool {
