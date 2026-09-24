@@ -1,0 +1,4 @@
+name: no-mistakes
+hooks:
+  harness.after: ["./hook.sh", "harness.after"]
+  task.completed: ["./hook.sh", "task.completed"]
