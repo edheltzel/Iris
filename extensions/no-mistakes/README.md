@@ -1,8 +1,8 @@
 # No-mistakes gate pack
 
-Refuses Iris task completion when the delivery mode requires
-[no-mistakes](https://github.com/kunchenguid/no-mistakes) and the CLI is missing
-or this workspace has no gate.
+Refuses an Iris ship when the task mode is `no-mistakes` and the
+[no-mistakes](https://github.com/kunchenguid/no-mistakes) CLI is not installed.
+Passing this hook does not mean the change was validated.
 
 ## Install
 
@@ -14,33 +14,27 @@ cp -R extensions/no-mistakes /path/to/workspace/.spynel/extensions/no-mistakes
 ```
 
 `iris extension install` cannot install this pack from the Iris repository URL.
-The manifest has to sit at the clone root.
 
 ## Mode
 
-Write one Firstmate mode as the first line of `.spynel/no-mistakes-mode`.
+Write one task mode as the first line of `.spynel/no-mistakes-mode`.
 A missing file means `no-mistakes`.
 
-| Mode | Hook behavior |
+| Mode | Behavior |
 | --- | --- |
-| `no-mistakes` | Require the CLI and a repo gate. |
-| `no-mistakes-prod-only` | Same. Iris cannot tell product work from internal work, so it requires the gate. |
-| `direct-PR` | Journal a skip. Do not run the CLI. |
-| `local-only` | Journal a skip. Do not run the CLI. |
+| `no-mistakes` | CLI missing: exit nonzero. CLI present: journal the handoff and exit zero. |
+| `direct-PR` | Skip. Do not look for the CLI. |
+| `local-only` | Skip. Do not look for the CLI. |
 
-## What it runs
+`no-mistakes-prod-only` is a Firstmate registry policy, not a task mode. The hook refuses it. Resolve the task to `no-mistakes` or `direct-PR` first.
 
-`task.completed` for outcome `done` runs `no-mistakes status` in the workspace.
-No `gate:` line, a failing status, or a missing CLI exits nonzero, and Iris
-does not settle that task. Other outcomes skip.
+`failed`, `cancelled`, and `waiting` outcomes skip.
 
-`harness.after` runs the same check and journals it, then exits zero. Failing
-that hook would replace the chat response, and the dispatch has already happened.
+## What it does not run
 
-The pack never runs `no-mistakes axi run`. That command pushes and opens a PR,
-and it blocks longer than a hook may run.
+The hook never executes `no-mistakes`, including `status`, `doctor`, and `axi run`.
+`status` only shows that `no-mistakes init` ran. `axi run` publishes and blocks
+longer than a hook may run.
 
-## Journal
-
-Skip, fail, and pass lines go to stderr and to
-`.spynel/extensions-state/no-mistakes/journal`.
+When the CLI is present, the journal says `/no-mistakes` is still the
+post-commit agent step. That step is what validates the change.
