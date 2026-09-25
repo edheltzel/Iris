@@ -20,3 +20,4 @@ Direct child DOX files:
 | --- | --- |
 | [gitbutler/AGENTS.md](gitbutler/AGENTS.md) | GitButler `but` task-lifecycle hook pack. |
 | [no-mistakes/AGENTS.md](no-mistakes/AGENTS.md) | No-mistakes delivery-mode gate pack. |
+| [quota/AGENTS.md](quota/AGENTS.md) | External workflow watcher and task-claim quota evidence. |
